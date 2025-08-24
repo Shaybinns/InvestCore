@@ -4,13 +4,10 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python test_minimal.py",
-    "healthcheckPath": "/health",
+    "startCommand": "python api_server.py",
+    "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
-  },
-  "variables": {
-    "NIXPACKS_PYTHON_VERSION": "3.11"
   }
 }

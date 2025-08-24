@@ -32,12 +32,14 @@ def health_check():
             "service": "InvestCore API",
             "version": "1.0.0",
             "timestamp": "2024-08-24",
-            "message": "API is running and responding"
+            "message": "API is running and responding",
+            "level": "info"
         })
     except Exception as e:
         return jsonify({
             "status": "unhealthy",
-            "error": str(e)
+            "error": str(e),
+            "level": "error"
         }), 500
 
 @app.route("/")
@@ -407,12 +409,18 @@ if __name__ == "__main__":
             print("✅ Brain module imported successfully")
         except Exception as e:
             print(f"❌ Brain import failed: {e}")
+            print("Full traceback:")
+            import traceback
+            traceback.print_exc()
             raise e
             
+        print("🚀 All imports successful, starting Flask server...")
         app.run(host=host, port=port, debug=False)
         
     except Exception as e:
         print(f"❌ Failed to start server: {e}")
+        print("Full traceback:")
         import traceback
         traceback.print_exc()
+        print("Exiting with error code 1")
         exit(1)
