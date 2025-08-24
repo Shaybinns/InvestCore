@@ -25,10 +25,28 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 @app.route("/api/health")
 def health_check():
     """Health check endpoint"""
+    try:
+        # Test basic functionality
+        return jsonify({
+            "status": "healthy",
+            "service": "InvestCore API",
+            "version": "1.0.0",
+            "timestamp": "2024-08-24",
+            "message": "API is running and responding"
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e)
+        }), 500
+
+@app.route("/")
+def root():
+    """Root endpoint for basic connectivity test"""
     return jsonify({
-        "status": "healthy",
-        "service": "InvestCore API",
-        "version": "1.0.0"
+        "message": "InvestCore API is running",
+        "health_check": "/api/health",
+        "chat_endpoint": "/api/chat"
     })
 
 @app.route("/api/chat", methods=["POST"])
@@ -373,12 +391,28 @@ def internal_error(error):
 # ============================================================================
 
 if __name__ == "__main__":
-    port = int(os.getenv('PORT', 5000))
-    host = os.getenv('HOST', '0.0.0.0')
-    
-    print(f"🚀 Starting InvestCore API on {host}:{port}")
-    print(f"📱 App endpoints available at http://{host}:{port}/api/")
-    print(f"🔍 Health check at http://{host}:{port}/api/health")
-    print(f"🌍 Railway deployment ready!")
-    
-    app.run(host=host, port=port, debug=False)
+    try:
+        port = int(os.getenv('PORT', 5000))
+        host = os.getenv('HOST', '0.0.0.0')
+        
+        print(f"🚀 Starting InvestCore API on {host}:{port}")
+        print(f"📱 App endpoints available at http://{host}:{port}/api/")
+        print(f"🔍 Health check at http://{host}:{port}/api/health")
+        print(f"🌍 Railway deployment ready!")
+        
+        # Test imports before starting
+        print("🔍 Testing imports...")
+        try:
+            from brain import handle_user_message
+            print("✅ Brain module imported successfully")
+        except Exception as e:
+            print(f"❌ Brain import failed: {e}")
+            raise e
+            
+        app.run(host=host, port=port, debug=False)
+        
+    except Exception as e:
+        print(f"❌ Failed to start server: {e}")
+        import traceback
+        traceback.print_exc()
+        exit(1)
