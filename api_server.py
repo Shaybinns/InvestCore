@@ -75,6 +75,7 @@ def chat():
                 "success": False
             }), 500
         
+        # Return structured response for backward compatibility
         return jsonify({
             "success": True,
             "user_id": user_id,
@@ -88,6 +89,87 @@ def chat():
             "has_more_steps": response_data.get("has_more_steps"),
             "error": response_data.get("error")
         })
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Internal server error: {str(e)}",
+            "success": False
+        }), 500
+
+@app.route("/api/chat/stream", methods=["POST"])
+def chat_stream():
+    """Streaming chat endpoint using NDJSON for staggered responses"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+            
+        user_id = data.get("user_id")
+        message = data.get("message")
+
+        if not user_id or not message:
+            return jsonify({"error": "Missing user_id or message"}), 400
+
+        # Import brain here to avoid circular imports
+        try:
+            from brain import handle_user_message
+            response_data = handle_user_message(user_id, message)
+        except ImportError as e:
+            return jsonify({
+                "error": f"Brain module not available: {str(e)}",
+                "success": False
+            }), 500
+
+        def generate_ndjson():
+            """Generate NDJSON response with staggered timing"""
+            import time
+            
+            # Send initial response first
+            initial_data = {
+                "type": "initial_response",
+                "user_id": user_id,
+                "message": response_data.get("initial_response"),
+                "timestamp": time.time()
+            }
+            yield json.dumps(initial_data) + "\n"
+            
+            # Small delay to simulate staggered response
+            time.sleep(0.5)
+            
+            # Send command result
+            command_data = {
+                "type": "command_result",
+                "user_id": user_id,
+                "command_executed": response_data.get("command_executed", False),
+                "status": response_data.get("status"),
+                "command_name": response_data.get("command_name"),
+                "goal": response_data.get("goal"),
+                "missing_fields": response_data.get("missing_fields"),
+                "has_more_steps": response_data.get("has_more_steps"),
+                "result": response_data.get("command_result"),
+                "error": response_data.get("error"),
+                "timestamp": time.time()
+            }
+            yield json.dumps(command_data) + "\n"
+            
+            # Send completion signal
+            completion_data = {
+                "type": "completion",
+                "user_id": user_id,
+                "success": True,
+                "timestamp": time.time()
+            }
+            yield json.dumps(completion_data) + "\n"
+
+        return app.response_class(
+            generate_ndjson(),
+            mimetype='application/x-ndjson',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no'
+            }
+        )
         
     except Exception as e:
         return jsonify({

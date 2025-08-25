@@ -23,6 +23,8 @@ HTML_TEMPLATE = """
         .ai-initial { background: #f3e5f5; border-left: 4px solid #9c27b0; }
         .ai-result { background: #e8f5e8; border-left: 4px solid #4caf50; }
         .error { background: #ffebee; border-left: 4px solid #f44336; }
+        .streaming { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .status { font-size: 12px; color: #666; margin-top: 5px; }
         .api-info { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0; }
         .endpoint-test { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -47,6 +49,8 @@ HTML_TEMPLATE = """
             <div class="input-area">
                 <input type="text" id="user-input" placeholder="Ask me anything about stocks, markets, etc..." onkeypress="if(event.key=='Enter') sendMessage()">
                 <button onclick="sendMessage()">Send</button>
+                <button onclick="sendMessageStream()" style="background: #28a745;">🚀 Stream</button>
+                <button onclick="testStreamEndpoint()" style="background: #ffc107; color: #000;">🧪 Test Stream</button>
             </div>
             
             <div id="chat-messages"></div>
@@ -129,6 +133,123 @@ HTML_TEMPLATE = """
                 
             } catch (error) {
                 addMessage('error', 'API Error: ' + error.message);
+            }
+        }
+
+        async function sendMessageStream() {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            console.log('🚀 Starting streaming request for:', message);
+            
+            // Add user message
+            addMessage('user', message);
+            input.value = '';
+            
+            // Clear previous AI messages for this conversation
+            const messagesDiv = document.getElementById('chat-messages');
+            const aiMessages = messagesDiv.querySelectorAll('.ai-initial, .ai-result');
+            aiMessages.forEach(msg => msg.remove());
+            
+            try {
+                console.log('📡 Fetching from streaming endpoint...');
+                const response = await fetch(API_BASE + '/api/chat/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: 'test_user',
+                        message: message
+                    })
+                });
+
+                console.log('📥 Response received:', response.status, response.headers.get('content-type'));
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                console.log('📖 Starting to read stream...');
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        console.log('✅ Stream complete');
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value);
+                    console.log('📦 Received chunk:', chunk);
+                    
+                    const lines = chunk.split('\n').filter(line => line.trim());
+                    console.log('📝 Parsed lines:', lines);
+                    
+                    for (const line of lines) {
+                        try {
+                            const data = JSON.parse(line);
+                            console.log('🎯 Parsed data:', data);
+                            
+                            switch (data.type) {
+                                case 'initial_response':
+                                    console.log('🚀 Adding initial response');
+                                    addMessage('ai-initial', data.message, '🚀 Initial Response');
+                                    break;
+                                    
+                                case 'command_result':
+                                    console.log('⚡ Adding command result');
+                                    addMessage('ai-result', data.result || 'No result', '⚡ Command Result');
+                                    break;
+                                    
+                                case 'completion':
+                                    console.log('✅ Adding completion');
+                                    addMessage('ai-result', '✅ Complete!', 'Status');
+                                    break;
+                                    
+                                default:
+                                    console.log('❓ Unknown response type:', data);
+                            }
+                        } catch (parseError) {
+                            console.error('❌ Failed to parse JSON:', line, parseError);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('💥 Streaming error:', error);
+                addMessage('error', 'Streaming Error: ' + error.message);
+            }
+        }
+        
+        async function testStreamEndpoint() {
+            console.log('🧪 Testing stream endpoint...');
+            
+            try {
+                const response = await fetch(API_BASE + '/api/chat/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: 'test_user',
+                        message: 'test message'
+                    })
+                });
+                
+                console.log('📥 Test response:', response.status, response.headers.get('content-type'));
+                
+                if (response.ok) {
+                    addMessage('ai-result', `✅ Stream endpoint working! Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}`, 'Test Result');
+                } else {
+                    addMessage('error', `❌ Stream endpoint failed! Status: ${response.status}`, 'Test Result');
+                }
+            } catch (error) {
+                console.error('💥 Test error:', error);
+                addMessage('error', `❌ Test failed: ${error.message}`, 'Test Result');
             }
         }
         
