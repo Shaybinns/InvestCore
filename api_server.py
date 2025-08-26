@@ -545,6 +545,14 @@ if __name__ == "__main__":
         
         # Railway-friendly startup - don't fail on brain import
         print("🔍 Testing imports...")
+        
+        # Debug environment variables
+        print("🔍 Environment check:")
+        print(f"   RAPIDAPI_KEY: {'✅ Found' if os.getenv('RAPIDAPI_KEY') else '❌ Missing'}")
+        print(f"   OPENAI_API_KEY: {'✅ Found' if os.getenv('OPENAI_API_KEY') else '❌ Missing'}")
+        print(f"   SECRET_KEY: {'✅ Found' if os.getenv('SECRET_KEY') else '❌ Missing'}")
+        print(f"   PORT: {os.getenv('PORT', '5000 (default)')}")
+        
         try:
             from brain import handle_user_message
             print("✅ Brain module imported successfully")
