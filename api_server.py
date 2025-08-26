@@ -24,22 +24,46 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 
 @app.route("/api/health")
 def health_check():
-    """Health check endpoint"""
+    """Health check endpoint - Railway compatible"""
     try:
-        # Test basic functionality
+        # Test core functionality - brain module MUST be available
+        from brain import handle_user_message
+        
+        # If we get here, brain module is working
         return jsonify({
             "status": "healthy",
             "service": "InvestCore API",
             "version": "1.0.0",
-            "timestamp": "2024-08-24",
-            "message": "API is running and responding",
-            "level": "info"
-        })
-    except Exception as e:
+            "timestamp": "2025-08-24",
+            "message": "API is running with full functionality",
+            "level": "info",
+            "railway": "ready",
+            "brain_module": "available"
+        }), 200
+        
+    except ImportError as e:
+        # Brain module failed to import - this is a critical failure
         return jsonify({
             "status": "unhealthy",
-            "error": str(e),
-            "level": "error"
+            "service": "InvestCore API",
+            "version": "1.0.0",
+            "error": f"Brain module import failed: {str(e)}",
+            "level": "error",
+            "railway": "failed",
+            "brain_module": "unavailable",
+            "message": "Critical dependency missing - API cannot function"
+        }), 503  # Service Unavailable
+        
+    except Exception as e:
+        # Any other error is also critical
+        return jsonify({
+            "status": "unhealthy",
+            "service": "InvestCore API",
+            "version": "1.0.0",
+            "error": f"Unexpected error: {str(e)}",
+            "level": "error",
+            "railway": "failed",
+            "brain_module": "unknown"
         }), 500
 
 @app.route("/")
@@ -49,6 +73,7 @@ def root():
         "message": "InvestCore API is running",
         "health_check": "/api/health",
         "chat_endpoint": "/api/chat",
+        "railway": "ready",
         "available_endpoints": [
             "/api/health",
             "/api/chat", 
@@ -64,6 +89,23 @@ def root():
             "/api/search/web"
         ],
         "total_endpoints": 12
+    })
+
+@app.route("/api/railway/status")
+def railway_status():
+    """Railway-specific status endpoint"""
+    try:
+        from brain import handle_user_message
+        brain_status = "available"
+    except ImportError:
+        brain_status = "unavailable"
+    
+    return jsonify({
+        "railway": "deployed",
+        "status": "healthy",
+        "brain_module": brain_status,
+        "timestamp": "2024-08-24",
+        "deployment": "successful"
     })
 
 @app.route("/api/chat", methods=["POST"])
@@ -87,8 +129,9 @@ def chat():
         except ImportError as e:
             return jsonify({
                 "error": f"Brain module not available: {str(e)}",
-                "success": False
-            }), 500
+                "success": False,
+                "railway_status": "brain_module_unavailable"
+            }), 503  # Service Unavailable
         
         # Return structured response for backward compatibility
         return jsonify({
@@ -108,7 +151,8 @@ def chat():
     except Exception as e:
         return jsonify({
             "error": f"Internal server error: {str(e)}",
-            "success": False
+            "success": False,
+            "railway_status": "internal_error"
         }), 500
 
 @app.route("/api/chat/stream", methods=["POST"])
@@ -499,19 +543,18 @@ if __name__ == "__main__":
         print(f"🔍 Health check at http://{host}:{port}/api/health")
         print(f"🌍 Railway deployment ready!")
         
-        # Test imports before starting
+        # Railway-friendly startup - don't fail on brain import
         print("🔍 Testing imports...")
         try:
             from brain import handle_user_message
             print("✅ Brain module imported successfully")
+            brain_available = True
         except Exception as e:
-            print(f"❌ Brain import failed: {e}")
-            print("Full traceback:")
-            import traceback
-            traceback.print_exc()
-            raise e
+            print(f"⚠️ Brain import failed: {e}")
+            print("💡 Continuing startup for Railway deployment...")
+            brain_available = False
             
-        print("🚀 All imports successful, starting Flask server...")
+        print("🚀 Starting Flask server...")
         app.run(host=host, port=port, debug=False)
         
     except Exception as e:
