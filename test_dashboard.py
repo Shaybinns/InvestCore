@@ -1,78 +1,392 @@
 from flask import Flask, request, jsonify, render_template_string
 import requests
 import json
+import time
 
 app = Flask(__name__)
 
-# HTML template for the testing dashboard
+# HTML template for the improved testing dashboard
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>InvestCore API Testing Dashboard</title>
+    <title>InvestCore AI Chatbot - Testing Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .chat-box { background: white; border-radius: 10px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .input-area { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"] { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 16px; }
-        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0056b3; }
-        .message { margin: 15px 0; padding: 15px; border-radius: 8px; }
-        .user-message { background: #e3f2fd; border-left: 4px solid #2196f3; }
-        .ai-initial { background: #f3e5f5; border-left: 4px solid #9c27b0; }
-        .ai-result { background: #e8f5e8; border-left: 4px solid #4caf50; }
-        .error { background: #ffebee; border-left: 4px solid #f44336; }
-        .streaming { animation: fadeIn 0.5s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .status { font-size: 12px; color: #666; margin-top: 5px; }
-        .api-info { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0; }
-        .endpoint-test { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .response-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin: 10px 0; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .chat-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .chat-header h2 {
+            color: #667eea;
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .message {
+            margin: 15px 0;
+            padding: 15px 20px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message { 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .ai-message { 
+            background: white;
+            border: 2px solid #e9ecef;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .ai-message.thinking {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+            font-style: italic;
+        }
+        
+        .ai-message.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .ai-message.success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        
+        .chat-input input:focus {
+            border-color: #667eea;
+        }
+        
+        .chat-input button {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+        
+        .chat-input button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .chat-input button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .status-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        
+        .status-card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online { background: #28a745; }
+        .status-offline { background: #dc3545; }
+        
+        .quick-actions {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .quick-actions h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .quick-action-btn {
+            display: block;
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+            font-size: 14px;
+        }
+        
+        .quick-action-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .api-info {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .api-info h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .endpoint-list {
+            list-style: none;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .endpoint-list li {
+            margin: 5px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .endpoint-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin: 15px 0;
+            font-style: italic;
+            color: #666;
+        }
+        
+        .typing-indicator.show {
+            display: block;
+        }
+        
+        .typing-dots {
+            display: inline-block;
+            animation: typing 1.4s infinite;
+        }
+        
+        @keyframes typing {
+            0%, 20% { content: "●○○"; }
+            40% { content: "●●○"; }
+            60% { content: "●●●"; }
+            80%, 100% { content: "○○○"; }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .chat-section {
+                height: 500px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 InvestCore API Testing Dashboard</h1>
+        <div class="header">
+            <h1>🤖 InvestCore AI Chatbot</h1>
+            <p>Your intelligent investment research assistant</p>
+        </div>
         
-        <div class="api-info">
-            <h3>📡 API Status</h3>
-            <p><strong>Base URL:</strong> <span id="api-url">http://localhost:5000</span></p>
-            <p><strong>Status:</strong> <span id="api-status">Checking...</span></p>
-            <button onclick="checkHealth()">🔄 Check Health</button>
-        </div>
-
-        <div class="chat-box">
-            <h2>💬 Chat Testing</h2>
-            <p>Test the <code>/api/chat</code> endpoint with real API calls</p>
-            
-            <div class="input-area">
-                <input type="text" id="user-input" placeholder="Ask me anything about stocks, markets, etc..." onkeypress="if(event.key=='Enter') sendMessage()">
-                <button onclick="sendMessage()">Send</button>
-                <button onclick="sendMessageStream()" style="background: #28a745;">🚀 Stream</button>
-                <button onclick="testStreamEndpoint()" style="background: #ffc107; color: #000;">🧪 Test Stream</button>
+        <div class="dashboard-grid">
+            <!-- Main Chat Section -->
+            <div class="chat-section">
+                <div class="chat-header">
+                    <h2>💬 Chat with InvestCore AI</h2>
+                    <p>Ask me about stocks, markets, portfolio analysis, and more!</p>
+                </div>
+                
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message ai-message">
+                        👋 Hello! I'm InvestCore AI, your investment research assistant. I can help you with:
+                        <br><br>
+                        📊 Stock analysis and screening<br>
+                        📈 Market and sector assessments<br>
+                        💰 Financial data and earnings<br>
+                        🌍 Macroeconomic insights<br>
+                        🔍 Web research and news<br>
+                        <br>
+                        What would you like to know about today?
+                    </div>
+                </div>
+                
+                <div class="typing-indicator" id="typing-indicator">
+                    <span class="typing-dots">●○○</span> AI is thinking...
+                </div>
+                
+                <div class="chat-input">
+                    <input type="text" id="user-input" placeholder="Ask me anything about investments..." onkeypress="if(event.key=='Enter') sendMessage()">
+                    <button onclick="sendMessage()" id="send-btn">Send</button>
+                </div>
             </div>
             
-            <div id="chat-messages"></div>
-        </div>
-
-        <div class="endpoint-test">
-            <h2>🧪 Endpoint Testing</h2>
-            <p>Test other API endpoints</p>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input type="text" id="asset-symbol" placeholder="Stock symbol (e.g., AAPL)" value="AAPL">
-                <button onclick="testAssetInfo()">Test Asset Info</button>
-                <button onclick="testFinancials()">Test Financials</button>
-                <button onclick="testEarnings()">Test Earnings</button>
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- API Status -->
+                <div class="status-card">
+                    <h3>🔌 API Status</h3>
+                    <p><span class="status-indicator" id="status-indicator"></span><span id="api-status">Checking...</span></p>
+                    <button onclick="checkHealth()" style="margin-top: 15px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 10px; cursor: pointer;">🔄 Refresh</button>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <h3>⚡ Quick Actions</h3>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('Analyze AAPL stock')">📊 Analyze AAPL</button>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('What is the current market sentiment?')">📈 Market Sentiment</button>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('Screen for tech stocks with high growth')">🔍 Screen Tech Stocks</button>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('Get financial data for TSLA')">💰 TSLA Financials</button>
+                    <button class="quick-action-btn" onclick="sendQuickMessage('What are the latest earnings trends?')">📊 Earnings Trends</button>
+                </div>
+                
+                <!-- API Info -->
+                <div class="api-info">
+                    <h3>🔗 Available Endpoints</h3>
+                    <ul class="endpoint-list">
+                        <li><strong>POST</strong> /api/chat - Main chat</li>
+                        <li><strong>GET</strong> /api/asset/{symbol} - Asset info</li>
+                        <li><strong>POST</strong> /api/screen - Asset screening</li>
+                        <li><strong>POST</strong> /api/market/assess - Market analysis</li>
+                        <li><strong>GET</strong> /api/financials/{symbol} - Financial data</li>
+                        <li><strong>GET</strong> /api/earnings/{symbol} - Earnings data</li>
+                        <li><strong>GET</strong> /api/macros - Macro indicators</li>
+                    </ul>
+                </div>
             </div>
-            
-            <div id="endpoint-results"></div>
         </div>
     </div>
 
     <script>
         const API_BASE = 'http://localhost:5000';
+        let isProcessing = false;
         
         // Check API health on load
         window.onload = function() {
@@ -80,25 +394,50 @@ HTML_TEMPLATE = """
         };
         
         async function checkHealth() {
+            const statusIndicator = document.getElementById('status-indicator');
+            const apiStatus = document.getElementById('api-status');
+            
             try {
                 const response = await fetch(API_BASE + '/api/health');
                 const data = await response.json();
-                document.getElementById('api-status').innerHTML = '✅ Online - ' + data.status;
-                document.getElementById('api-status').style.color = '#28a745';
+                
+                if (response.ok) {
+                    statusIndicator.className = 'status-indicator status-online';
+                    apiStatus.innerHTML = 'Online - ' + data.status;
+                    apiStatus.style.color = '#28a745';
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
             } catch (error) {
-                document.getElementById('api-status').innerHTML = '❌ Offline - ' + error.message;
-                document.getElementById('api-status').style.color = '#dc3545';
+                statusIndicator.className = 'status-indicator status-offline';
+                apiStatus.innerHTML = 'Offline - ' + error.message;
+                apiStatus.style.color = '#dc3545';
             }
+        }
+        
+        function sendQuickMessage(message) {
+            document.getElementById('user-input').value = message;
+            sendMessage();
         }
         
         async function sendMessage() {
             const input = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
             const message = input.value.trim();
-            if (!message) return;
+            
+            if (!message || isProcessing) return;
             
             // Add user message
             addMessage('user', message);
             input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Disable input and button
+            isProcessing = true;
+            input.disabled = true;
+            sendBtn.disabled = true;
             
             try {
                 const response = await fetch(API_BASE + '/api/chat', {
@@ -107,234 +446,78 @@ HTML_TEMPLATE = """
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        user_id: 'test_user',
+                        user_id: 'test_user_' + Date.now(),
                         message: message
                     })
                 });
                 
                 const data = await response.json();
+                
+                // Hide typing indicator
+                hideTypingIndicator();
                 
                 if (data.success) {
                     // Show initial response
                     if (data.initial_response) {
-                        addMessage('ai-initial', data.initial_response, 'Initial AI Response');
+                        addMessage('ai', data.initial_response);
                     }
                     
-                    // Show command result
-                    if (data.command_result) {
-                        addMessage('ai-result', data.command_result, 'Command Result');
+                    // Show command result if available
+                    if (data.command_result && data.command_result !== data.initial_response) {
+                        addMessage('ai', data.command_result, 'success');
                     }
                     
-                    // Show status info
-                    addStatusInfo(data);
+                    // Show error if any
+                    if (data.error) {
+                        addMessage('ai', 'Error: ' + data.error, 'error');
+                    }
                 } else {
-                    addMessage('error', 'Error: ' + (data.error || 'Unknown error'));
+                    addMessage('ai', 'Error: ' + (data.error || 'Unknown error'), 'error');
                 }
                 
             } catch (error) {
-                addMessage('error', 'API Error: ' + error.message);
-            }
-        }
-
-        async function sendMessageStream() {
-            const input = document.getElementById('user-input');
-            const message = input.value.trim();
-            if (!message) return;
-            
-            console.log('🚀 Starting streaming request for:', message);
-            
-            // Add user message
-            addMessage('user', message);
-            input.value = '';
-            
-            // Clear previous AI messages for this conversation
-            const messagesDiv = document.getElementById('chat-messages');
-            const aiMessages = messagesDiv.querySelectorAll('.ai-initial, .ai-result');
-            aiMessages.forEach(msg => msg.remove());
-            
-            try {
-                console.log('📡 Fetching from streaming endpoint...');
-                const response = await fetch(API_BASE + '/api/chat/stream', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_id: 'test_user',
-                        message: message
-                    })
-                });
-
-                console.log('📥 Response received:', response.status, response.headers.get('content-type'));
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-
-                console.log('📖 Starting to read stream...');
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    
-                    if (done) {
-                        console.log('✅ Stream complete');
-                        break;
-                    }
-                    
-                    const chunk = decoder.decode(value);
-                    console.log('📦 Received chunk:', chunk);
-                    
-                    const lines = chunk.split('\n').filter(line => line.trim());
-                    console.log('📝 Parsed lines:', lines);
-                    
-                    for (const line of lines) {
-                        try {
-                            const data = JSON.parse(line);
-                            console.log('🎯 Parsed data:', data);
-                            
-                            switch (data.type) {
-                                case 'initial_response':
-                                    console.log('🚀 Adding initial response');
-                                    addMessage('ai-initial', data.message, '🚀 Initial Response');
-                                    break;
-                                    
-                                case 'command_result':
-                                    console.log('⚡ Adding command result');
-                                    addMessage('ai-result', data.result || 'No result', '⚡ Command Result');
-                                    break;
-                                    
-                                case 'completion':
-                                    console.log('✅ Adding completion');
-                                    addMessage('ai-result', '✅ Complete!', 'Status');
-                                    break;
-                                    
-                                default:
-                                    console.log('❓ Unknown response type:', data);
-                            }
-                        } catch (parseError) {
-                            console.error('❌ Failed to parse JSON:', line, parseError);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('💥 Streaming error:', error);
-                addMessage('error', 'Streaming Error: ' + error.message);
+                hideTypingIndicator();
+                addMessage('ai', 'Connection Error: ' + error.message, 'error');
+            } finally {
+                // Re-enable input and button
+                isProcessing = false;
+                input.disabled = false;
+                sendBtn.disabled = false;
+                input.focus();
             }
         }
         
-        async function testStreamEndpoint() {
-            console.log('🧪 Testing stream endpoint...');
-            
-            try {
-                const response = await fetch(API_BASE + '/api/chat/stream', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_id: 'test_user',
-                        message: 'test message'
-                    })
-                });
-                
-                console.log('📥 Test response:', response.status, response.headers.get('content-type'));
-                
-                if (response.ok) {
-                    addMessage('ai-result', `✅ Stream endpoint working! Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}`, 'Test Result');
-                } else {
-                    addMessage('error', `❌ Stream endpoint failed! Status: ${response.status}`, 'Test Result');
-                }
-            } catch (error) {
-                console.error('💥 Test error:', error);
-                addMessage('error', `❌ Test failed: ${error.message}`, 'Test Result');
-            }
+        function showTypingIndicator() {
+            document.getElementById('typing-indicator').classList.add('show');
         }
         
-        function addMessage(type, content, label = '') {
+        function hideTypingIndicator() {
+            document.getElementById('typing-indicator').classList.remove('show');
+        }
+        
+        function addMessage(type, content, style = '') {
             const messagesDiv = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
             
-            let html = '';
-            if (label) {
-                html += `<strong>${label}:</strong><br>`;
-            }
-            html += content.replace(/\\n/g, '<br>');
+            messageDiv.className = `message ${type}-message`;
+            if (style) messageDiv.classList.add(style);
             
-            messageDiv.innerHTML = html;
+            // Format content with line breaks
+            content = content.replace(/\\n/g, '<br>');
+            
+            messageDiv.innerHTML = content;
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
         
-        function addStatusInfo(data) {
-            const messagesDiv = document.getElementById('chat-messages');
-            const statusDiv = document.createElement('div');
-            statusDiv.className = 'message';
-            statusDiv.style.background = '#f8f9fa';
-            statusDiv.style.fontSize = '12px';
-            statusDiv.style.color = '#666';
-            
-            let statusInfo = `Status: ${data.status}`;
-            if (data.command_name) statusInfo += ` | Command: ${data.command_name}`;
-            if (data.command_executed !== undefined) statusInfo += ` | Executed: ${data.command_executed}`;
-            if (data.has_more_steps !== undefined) statusInfo += ` | More Steps: ${data.has_more_steps}`;
-            
-            statusDiv.innerHTML = statusInfo;
-            messagesDiv.appendChild(statusDiv);
-        }
+        // Auto-resize input on focus
+        document.getElementById('user-input').addEventListener('focus', function() {
+            this.style.transform = 'scale(1.02)';
+        });
         
-        async function testAssetInfo() {
-            const symbol = document.getElementById('asset-symbol').value.toUpperCase();
-            if (!symbol) return;
-            
-            try {
-                const response = await fetch(API_BASE + '/api/asset/' + symbol);
-                const data = await response.json();
-                showEndpointResult('Asset Info for ' + symbol, data);
-            } catch (error) {
-                showEndpointResult('Asset Info Error', { error: error.message });
-            }
-        }
-        
-        async function testFinancials() {
-            const symbol = document.getElementById('asset-symbol').value.toUpperCase();
-            if (!symbol) return;
-            
-            try {
-                const response = await fetch(API_BASE + '/api/financials/' + symbol);
-                const data = await response.json();
-                showEndpointResult('Financials for ' + symbol, data);
-            } catch (error) {
-                showEndpointResult('Financials Error', { error: error.message });
-            }
-        }
-        
-        async function testEarnings() {
-            const symbol = document.getElementById('asset-symbol').value.toUpperCase();
-            if (!symbol) return;
-            
-            try {
-                const response = await fetch(API_BASE + '/api/earnings/' + symbol);
-                const data = await response.json();
-                showEndpointResult('Earnings for ' + symbol, data);
-            } catch (error) {
-                showEndpointResult('Earnings Error', { error: error.message });
-            }
-        }
-        
-        function showEndpointResult(title, data) {
-            const resultsDiv = document.getElementById('endpoint-results');
-            const resultDiv = document.createElement('div');
-            resultDiv.className = 'endpoint-test';
-            resultDiv.innerHTML = `
-                <h4>${title}</h4>
-                <div class="response-box">${JSON.stringify(data, null, 2)}</div>
-            `;
-            resultsDiv.appendChild(resultDiv);
-        }
+        document.getElementById('user-input').addEventListener('blur', function() {
+            this.style.transform = 'scale(1)';
+        });
     </script>
 </body>
 </html>
@@ -344,8 +527,26 @@ HTML_TEMPLATE = """
 def dashboard():
     return HTML_TEMPLATE
 
+@app.route('/api/health')
+def dashboard_health():
+    """Health check for the dashboard itself"""
+    return jsonify({
+        "status": "healthy",
+        "service": "InvestCore Testing Dashboard",
+        "version": "2.0.0",
+        "message": "Dashboard is running"
+    })
+
 if __name__ == '__main__':
-    print("🚀 Starting InvestCore Testing Dashboard...")
+    print("🚀 Starting InvestCore AI Chatbot Testing Dashboard...")
     print("📱 Open http://localhost:5001 in your browser")
     print("🔗 Make sure your API server is running on http://localhost:5000")
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    print("💡 Use the quick action buttons to test different scenarios")
+    print("🔍 Check the sidebar for API status and available endpoints")
+    
+    try:
+        app.run(host='0.0.0.0', port=5001, debug=False)
+    except Exception as e:
+        print(f"❌ Failed to start dashboard: {e}")
+        print("💡 Try using a different port if 5001 is already in use")
+        exit(1)

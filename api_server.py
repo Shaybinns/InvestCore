@@ -48,7 +48,22 @@ def root():
     return jsonify({
         "message": "InvestCore API is running",
         "health_check": "/api/health",
-        "chat_endpoint": "/api/chat"
+        "chat_endpoint": "/api/chat",
+        "available_endpoints": [
+            "/api/health",
+            "/api/chat", 
+            "/api/chat/stream",
+            "/api/asset/<symbol>",
+            "/api/screen",
+            "/api/market/assess",
+            "/api/sector/assess",
+            "/api/asset/assess",
+            "/api/financials/<symbol>",
+            "/api/earnings/<symbol>",
+            "/api/macros",
+            "/api/search/web"
+        ],
+        "total_endpoints": 12
     })
 
 @app.route("/api/chat", methods=["POST"])

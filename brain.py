@@ -79,7 +79,6 @@ User: {message}
     command_name, args = extract_command_from_text(reply)
     if command_name:
         # Send the initial AI response immediately
-        print(f"Portfolio AI: {reply}")
         add_to_recent_conversation(user_id, f"User: {message}")
         add_to_recent_conversation(user_id, f"Assistant: {reply}")
         
