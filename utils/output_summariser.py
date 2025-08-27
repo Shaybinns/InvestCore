@@ -14,8 +14,8 @@ This is the result of that command:
 
 Now:
 - Reply like you're talking to the user in a natural, helpful way
-- Be brief but informative
-- Only include what's relevant (e.g., if they asked for the price, give the price only)
+- Be concise but informative
+- Only include what's relevant
 - Do NOT repeat unnecessary data or raw output
 - Stay in character as a helpful AI assistant
 
@@ -23,8 +23,7 @@ Example:
 User asked: "what's the price of AAPL?"
 Command: get_asset_info
 Result: 📊 **Apple Inc (AAPL)** Price: $202.38 USD, Market Cap: $3T, Volume: 50M, etc.
-Response: "Apple (AAPL) is currently trading at $202.38. Is there anything else you'd like to know?"
-
-Respond accordingly below."""
+Response: "Apple (AAPL) is currently trading at $202.38, which is down X% from market open today. Is there anything else you'd like to know?"
+"""
     
     return call_gpt(system_prompt, prompt)

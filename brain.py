@@ -20,6 +20,7 @@ def handle_user_message(user_id: str, message: str) -> dict:
     # STEP 1: Handle pending input collection
     if needs_more_input(user_id):
         filled = receive_input(user_id, message)
+
         if filled:
             try:
                 result = run_command(filled["command"], filled["args"])
@@ -209,7 +210,7 @@ def generate_ai_response_only(user_id: str, message: str) -> str:
 [Conversation So Far]
 {recent_chat}
 
-User: {message}
+You are replying directly to the user's message, which is - User: {message}
 {task_reminder}
 """
     reply = call_gpt(system_prompt, context)
