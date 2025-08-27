@@ -157,7 +157,7 @@ def chat():
 
 @app.route("/api/chat/stream", methods=["POST"])
 def chat_stream():
-    """Streaming chat endpoint using NDJSON for staggered responses"""
+    """True streaming chat endpoint that sends data as it's generated"""
     try:
         data = request.get_json()
         if not data:
@@ -169,59 +169,112 @@ def chat_stream():
         if not user_id or not message:
             return jsonify({"error": "Missing user_id or message"}), 400
 
-        # Import brain here to avoid circular imports
-        try:
-            from brain import handle_user_message
-            response_data = handle_user_message(user_id, message)
-        except ImportError as e:
-            return jsonify({
-                "error": f"Brain module not available: {str(e)}",
-                "success": False
-            }), 500
-
-        def generate_ndjson():
-            """Generate NDJSON response with staggered timing"""
+        def generate_stream():
+            """Generate true streaming response"""
             import time
             
-            # Send initial response first
-            initial_data = {
-                "type": "initial_response",
+            # Send start signal
+            yield json.dumps({
+                "type": "stream_start",
                 "user_id": user_id,
-                "message": response_data.get("initial_response"),
                 "timestamp": time.time()
-            }
-            yield json.dumps(initial_data) + "\n"
+            }) + "\n"
             
-            # Small delay to simulate staggered response
-            time.sleep(0.5)
-            
-            # Send command result
-            command_data = {
-                "type": "command_result",
-                "user_id": user_id,
-                "command_executed": response_data.get("command_executed", False),
-                "status": response_data.get("status"),
-                "command_name": response_data.get("command_name"),
-                "goal": response_data.get("goal"),
-                "missing_fields": response_data.get("missing_fields"),
-                "has_more_steps": response_data.get("has_more_steps"),
-                "result": response_data.get("command_result"),
-                "error": response_data.get("error"),
-                "timestamp": time.time()
-            }
-            yield json.dumps(command_data) + "\n"
-            
-            # Send completion signal
-            completion_data = {
-                "type": "completion",
-                "user_id": user_id,
-                "success": True,
-                "timestamp": time.time()
-            }
-            yield json.dumps(completion_data) + "\n"
+            # Import brain here to avoid circular imports
+            try:
+                from brain import generate_ai_response_only, execute_command_streaming
+                
+                # STEP 1: Get AI response immediately (without executing commands)
+                ai_response_data = generate_ai_response_only(user_id, message)
+                
+                # Handle the response data
+                if isinstance(ai_response_data, tuple):
+                    # Command detected
+                    ai_response, command_name, args, goal = ai_response_data
+                else:
+                    # No command, just conversation
+                    ai_response = ai_response_data
+                    command_name, args, goal = None, None, None
+                
+                # STEP 2: Stream the AI response immediately
+                if ai_response:
+                    sentences = ai_response.split('. ')
+                    for i, sentence in enumerate(sentences):
+                        if sentence.strip():
+                            yield json.dumps({
+                                "type": "initial_response",
+                                "chunk": sentence.strip() + ('.' if i < len(sentences) - 1 else ''),
+                                "chunk_number": i + 1,
+                                "total_chunks": len(sentences),
+                                "timestamp": time.time()
+                            }) + "\n"
+                            time.sleep(0.1)  # Small delay for streaming effect
+                
+                # STEP 3: If there's a command, execute it and stream progress
+                if command_name:
+                    # Send command start
+                    yield json.dumps({
+                        "type": "command_start",
+                        "message": f"Executing {command_name}...",
+                        "command_name": command_name,
+                        "timestamp": time.time()
+                    }) + "\n"
+                    
+                    # Execute the command (this is where the real work happens)
+                    command_result = execute_command_streaming(command_name, args, user_id, message)
+                    
+                    # Send command result
+                    yield json.dumps({
+                        "type": "command_result",
+                        "user_id": user_id,
+                        "command_result": command_result.get("command_result"),
+                        "command_executed": command_result.get("command_executed", False),
+                        "status": command_result.get("status"),
+                        "command_name": command_result.get("command_name"),
+                        "goal": goal,
+                        "missing_fields": command_result.get("missing_fields"),
+                        "has_more_steps": command_result.get("has_more_steps"),
+                        "error": command_result.get("error"),
+                        "timestamp": time.time()
+                    }) + "\n"
+                else:
+                    # No command to execute, send empty command result
+                    yield json.dumps({
+                        "type": "command_result",
+                        "user_id": user_id,
+                        "command_result": None,
+                        "command_executed": False,
+                        "status": "conversation_only",
+                        "command_name": None,
+                        "goal": None,
+                        "missing_fields": None,
+                        "has_more_steps": False,
+                        "error": None,
+                        "timestamp": time.time()
+                    }) + "\n"
+                
+                # Send completion
+                yield json.dumps({
+                    "type": "completion",
+                    "success": True,
+                    "timestamp": time.time()
+                }) + "\n"
+                
+            except ImportError as e:
+                yield json.dumps({
+                    "type": "error",
+                    "error": f"Brain module not available: {str(e)}",
+                    "timestamp": time.time()
+                }) + "\n"
+            except Exception as e:
+                yield json.dumps({
+                    "type": "error",
+                    "error": f"Processing failed: {str(e)}",
+                    "timestamp": time.time()
+                }) + "\n"
 
         return app.response_class(
-            generate_ndjson(),
+            generate_stream(),
             mimetype='application/x-ndjson',
             headers={
                 'Cache-Control': 'no-cache',
