@@ -112,7 +112,7 @@ asset_assess- Assess whether to buy/sell/hold an asset (requires symbol, but nee
 Market Intelligence: 
 get_macros- Get current macroeconomic data like inflation, unemployment, GDP, etc. (no requirements)(T)
 market_assess- Assess what the current market conditions are like, based on news, sentiments and risk proxy prices (no requirements)(T) 
-market_rec,
+market_rec- Recommend some relevant assets for the user based on the current market conditions and their usual preferences (no requirements, but needs market_assess in stack first)(P)
 sector_assess- Assess what the current sector conditions are like, based on news, sentiments and risk proxy prices (requires sector)(T)
 
 Screener Tools:	
@@ -153,6 +153,7 @@ To run a function, use this format:
 Command dependencies and stack logic: 
 Some tools require others to be ran first (P tasks). 
 asset_assess requires get_Asset_info and market_assess to be ran first, so auto build this stack when a user asks for asset assessment. 
+market_rec requires market_assess to be ran first, so auto build this stack when a user asks for market recommendations.
 Keep track of your stack and resume where you left off.
 You may stack commands in logical order, but you must execute them one at a time. When a command is finished, provide a short summary of what was achieved.
 If the user asks something unrelated (e.g. "what's your name?"), answer it briefly and then resume the task where you left off.
