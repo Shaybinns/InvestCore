@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Database table name constant
+SHORT_TERM_DB = "Short Term Memory"
+
 def get_db_connection():
     """Get connection to database using Railway's injected DATABASE_URL"""
     return psycopg2.connect(os.getenv('DATABASE_URL'))
@@ -22,8 +25,8 @@ def add_to_recent_conversation(user_id: str, message: str):
         cursor = conn.cursor()
         
         # Get existing messages
-        cursor.execute("""
-            SELECT recent_messages FROM short_term_memory 
+        cursor.execute(f"""
+            SELECT recent_messages FROM "{SHORT_TERM_DB}"
             WHERE user_id = %s
         """, (user_id,))
         
@@ -48,15 +51,15 @@ def add_to_recent_conversation(user_id: str, message: str):
         # Update database with proper timestamps
         if result and result[0]:
             # Existing user, update messages and expires_at
-            cursor.execute("""
-                UPDATE short_term_memory 
+            cursor.execute(f"""
+                UPDATE "{SHORT_TERM_DB}"
                 SET recent_messages = %s, updated_at = %s, expires_at = %s
                 WHERE user_id = %s
             """, (json.dumps(messages), datetime.now(), expires_at, user_id))
         else:
             # New user, insert with created_at and expires_at
-            cursor.execute("""
-                INSERT INTO short_term_memory 
+            cursor.execute(f"""
+                INSERT INTO "{SHORT_TERM_DB}"
                 (user_id, recent_messages, created_at, updated_at, expires_at)
                 VALUES (%s, %s, %s, %s, %s)
             """, (user_id, json.dumps(messages), created_at, datetime.now(), expires_at))
@@ -76,8 +79,8 @@ def get_recent_conversation(user_id: str) -> str:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT recent_messages FROM short_term_memory 
+        cursor.execute(f"""
+            SELECT recent_messages FROM "{SHORT_TERM_DB}"
             WHERE user_id = %s AND expires_at > NOW()
         """, (user_id,))
         
@@ -103,8 +106,8 @@ def update_current_cache(user_id: str, cache_data: Dict[str, Any]):
         cursor = conn.cursor()
         
         # Get existing cache
-        cursor.execute("""
-            SELECT current_cache FROM short_term_memory 
+        cursor.execute(f"""
+            SELECT current_cache FROM "{SHORT_TERM_DB}"
             WHERE user_id = %s AND expires_at > NOW()
         """, (user_id,))
         
@@ -115,8 +118,8 @@ def update_current_cache(user_id: str, cache_data: Dict[str, Any]):
         updated_cache = {**existing_cache, **cache_data}
         
         # Update database
-        cursor.execute("""
-            INSERT INTO short_term_memory (user_id, current_cache, created_at, updated_at, expires_at)
+        cursor.execute(f"""
+            INSERT INTO "{SHORT_TERM_DB}" (user_id, current_cache, created_at, updated_at, expires_at)
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (user_id) 
             DO UPDATE SET 
@@ -143,8 +146,8 @@ def get_current_cache(user_id: str) -> Dict[str, Any]:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT current_cache FROM short_term_memory 
+        cursor.execute(f"""
+            SELECT current_cache FROM "{SHORT_TERM_DB}"
             WHERE user_id = %s AND expires_at > NOW()
         """, (user_id,))
         
@@ -168,8 +171,8 @@ def update_market_data(user_id: str, market_data: Dict[str, Any]):
         market_data["last_updated"] = datetime.now().isoformat()
         
         # Update database
-        cursor.execute("""
-            INSERT INTO short_term_memory (user_id, current_market_data, created_at, updated_at, expires_at)
+        cursor.execute(f"""
+            INSERT INTO "{SHORT_TERM_DB}" (user_id, current_market_data, created_at, updated_at, expires_at)
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (user_id) 
             DO UPDATE SET 
@@ -196,8 +199,8 @@ def get_current_market_data(user_id: str) -> Dict[str, Any]:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT current_market_data FROM short_term_memory 
+        cursor.execute(f"""
+            SELECT current_market_data FROM "{SHORT_TERM_DB}"
             WHERE user_id = %s AND expires_at > NOW()
         """, (user_id,))
         
@@ -217,8 +220,8 @@ def cleanup_expired_entries():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            DELETE FROM short_term_memory 
+        cursor.execute(f"""
+            DELETE FROM "{SHORT_TERM_DB}"
             WHERE expires_at < NOW()
         """)
         
@@ -259,8 +262,8 @@ def clear_user_data(user_id: str):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            DELETE FROM short_term_memory 
+        cursor.execute(f"""
+            DELETE FROM "{SHORT_TERM_DB}"
             WHERE user_id = %s
         """, (user_id,))
         
@@ -279,10 +282,10 @@ def get_user_data_summary(user_id: str) -> Dict[str, Any]:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT recent_messages, current_cache, current_market_data, 
                    created_at, updated_at, expires_at
-            FROM short_term_memory 
+            FROM "{SHORT_TERM_DB}"
             WHERE user_id = %s AND expires_at > NOW()
         """, (user_id,))
         
