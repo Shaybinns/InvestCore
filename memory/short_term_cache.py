@@ -1,14 +1,14 @@
 import psycopg2
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, List, Any
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Database table name constant
-SHORT_TERM_DB = "Short Term Memory"
+SHORT_TERM_DB = "short_term_memory"
 
 def get_db_connection():
     """Get connection to database using Railway's injected DATABASE_URL"""
@@ -26,7 +26,7 @@ def add_to_recent_conversation(user_id: str, message: str):
         
         # Get existing messages
         cursor.execute(f"""
-            SELECT recent_messages FROM "{SHORT_TERM_DB}"
+            SELECT recent_messages FROM {SHORT_TERM_DB}
             WHERE user_id = %s
         """, (user_id,))
         
@@ -34,12 +34,12 @@ def add_to_recent_conversation(user_id: str, message: str):
         if result and result[0]:
             messages = result[0]
             # Use existing created_at, update expires_at to 24 hours from now
-            expires_at = datetime.now() + timedelta(hours=24)
+            expires_at = (datetime.now() + timedelta(hours=24)).date()
         else:
             messages = []
             # New user, set both created_at and expires_at
-            created_at = datetime.now()
-            expires_at = created_at + timedelta(hours=24)
+            created_at = datetime.now().date()
+            expires_at = (datetime.now() + timedelta(hours=24)).date()
         
         # Add new message (just the text, no role categorization)
         messages.append(message)
@@ -52,17 +52,17 @@ def add_to_recent_conversation(user_id: str, message: str):
         if result and result[0]:
             # Existing user, update messages and expires_at
             cursor.execute(f"""
-                UPDATE "{SHORT_TERM_DB}"
-                SET recent_messages = %s, updated_at = %s, expires_at = %s
+                UPDATE {SHORT_TERM_DB}
+                SET recent_messages = %s, expires_at = %s
                 WHERE user_id = %s
-            """, (json.dumps(messages), datetime.now(), expires_at, user_id))
+            """, (json.dumps(messages), expires_at, user_id))
         else:
             # New user, insert with created_at and expires_at
             cursor.execute(f"""
-                INSERT INTO "{SHORT_TERM_DB}"
-                (user_id, recent_messages, created_at, updated_at, expires_at)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, json.dumps(messages), created_at, datetime.now(), expires_at))
+                INSERT INTO {SHORT_TERM_DB}
+                (user_id, recent_messages, created_at, expires_at)
+                VALUES (%s, %s, %s, %s)
+            """, (user_id, json.dumps(messages), created_at, expires_at))
         
         conn.commit()
         cursor.close()
@@ -80,8 +80,8 @@ def get_recent_conversation(user_id: str) -> str:
         cursor = conn.cursor()
         
         cursor.execute(f"""
-            SELECT recent_messages FROM "{SHORT_TERM_DB}"
-            WHERE user_id = %s AND expires_at > NOW()
+            SELECT recent_messages FROM {SHORT_TERM_DB}
+            WHERE user_id = %s AND expires_at > CURRENT_DATE
         """, (user_id,))
         
         result = cursor.fetchone()
@@ -107,8 +107,8 @@ def update_current_cache(user_id: str, cache_data: Dict[str, Any]):
         
         # Get existing cache
         cursor.execute(f"""
-            SELECT current_cache FROM "{SHORT_TERM_DB}"
-            WHERE user_id = %s AND expires_at > NOW()
+            SELECT current_cache FROM {SHORT_TERM_DB}
+            WHERE user_id = %s AND expires_at > CURRENT_DATE
         """, (user_id,))
         
         result = cursor.fetchone()
@@ -119,17 +119,16 @@ def update_current_cache(user_id: str, cache_data: Dict[str, Any]):
         
         # Update database
         cursor.execute(f"""
-            INSERT INTO "{SHORT_TERM_DB}" (user_id, current_cache, created_at, updated_at, expires_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO {SHORT_TERM_DB} (user_id, current_cache, created_at, expires_at)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (user_id) 
             DO UPDATE SET 
                 current_cache = %s,
-                updated_at = %s,
                 expires_at = %s
-        """, (user_id, json.dumps(updated_cache), datetime.now(), datetime.now(), 
-               datetime.now() + timedelta(hours=24),
-               json.dumps(updated_cache), datetime.now(), 
-               datetime.now() + timedelta(hours=24)))
+        """, (user_id, json.dumps(updated_cache), datetime.now().date(), 
+               (datetime.now() + timedelta(hours=24)).date(),
+               json.dumps(updated_cache), 
+               (datetime.now() + timedelta(hours=24)).date()))
         
         conn.commit()
         cursor.close()
@@ -147,8 +146,8 @@ def get_current_cache(user_id: str) -> Dict[str, Any]:
         cursor = conn.cursor()
         
         cursor.execute(f"""
-            SELECT current_cache FROM "{SHORT_TERM_DB}"
-            WHERE user_id = %s AND expires_at > NOW()
+            SELECT current_cache FROM {SHORT_TERM_DB}
+            WHERE user_id = %s AND expires_at > CURRENT_DATE
         """, (user_id,))
         
         result = cursor.fetchone()
@@ -172,17 +171,16 @@ def update_market_data(user_id: str, market_data: Dict[str, Any]):
         
         # Update database
         cursor.execute(f"""
-            INSERT INTO "{SHORT_TERM_DB}" (user_id, current_market_data, created_at, updated_at, expires_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO {SHORT_TERM_DB} (user_id, current_market_data, created_at, expires_at)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (user_id) 
             DO UPDATE SET 
                 current_market_data = %s,
-                updated_at = %s,
                 expires_at = %s
-        """, (user_id, json.dumps(market_data), datetime.now(), datetime.now(), 
-               datetime.now() + timedelta(hours=24),
-               json.dumps(market_data), datetime.now(), 
-               datetime.now() + timedelta(hours=24)))
+        """, (user_id, json.dumps(market_data), datetime.now().date(), 
+               (datetime.now() + timedelta(hours=24)).date(),
+               json.dumps(market_data), 
+               (datetime.now() + timedelta(hours=24)).date()))
         
         conn.commit()
         cursor.close()
@@ -200,8 +198,8 @@ def get_current_market_data(user_id: str) -> Dict[str, Any]:
         cursor = conn.cursor()
         
         cursor.execute(f"""
-            SELECT current_market_data FROM "{SHORT_TERM_DB}"
-            WHERE user_id = %s AND expires_at > NOW()
+            SELECT current_market_data FROM {SHORT_TERM_DB}
+            WHERE user_id = %s AND expires_at > CURRENT_DATE
         """, (user_id,))
         
         result = cursor.fetchone()
@@ -221,8 +219,8 @@ def cleanup_expired_entries():
         cursor = conn.cursor()
         
         cursor.execute(f"""
-            DELETE FROM "{SHORT_TERM_DB}"
-            WHERE expires_at < NOW()
+            DELETE FROM {SHORT_TERM_DB}
+            WHERE expires_at < CURRENT_DATE
         """)
         
         deleted_count = cursor.rowcount
@@ -263,7 +261,7 @@ def clear_user_data(user_id: str):
         cursor = conn.cursor()
         
         cursor.execute(f"""
-            DELETE FROM "{SHORT_TERM_DB}"
+            DELETE FROM {SHORT_TERM_DB}
             WHERE user_id = %s
         """, (user_id,))
         
@@ -284,9 +282,9 @@ def get_user_data_summary(user_id: str) -> Dict[str, Any]:
         
         cursor.execute(f"""
             SELECT recent_messages, current_cache, current_market_data, 
-                   created_at, updated_at, expires_at
-            FROM "{SHORT_TERM_DB}"
-            WHERE user_id = %s AND expires_at > NOW()
+                   created_at, expires_at
+            FROM {SHORT_TERM_DB}
+            WHERE user_id = %s AND expires_at > CURRENT_DATE
         """, (user_id,))
         
         result = cursor.fetchone()
@@ -304,11 +302,11 @@ def get_user_data_summary(user_id: str) -> Dict[str, Any]:
                 "time_until_expiry": "No data"
             }
         
-        messages, cache, market_data, created_at, updated_at, expires_at = result
+        messages, cache, market_data, created_at, expires_at = result
         
         # Calculate time until expiry
-        time_until_expiry = expires_at - datetime.now()
-        hours_remaining = time_until_expiry.total_seconds() / 3600
+        time_until_expiry = expires_at - datetime.now().date()
+        hours_remaining = time_until_expiry.days * 24
         
         return {
             "user_id": user_id,
@@ -316,7 +314,6 @@ def get_user_data_summary(user_id: str) -> Dict[str, Any]:
             "cache_keys": list(cache.keys()) if cache else [],
             "market_data_keys": list(market_data.keys()) if market_data else [],
             "created_at": created_at,
-            "updated_at": updated_at,
             "expires_at": expires_at,
             "time_until_expiry": f"{hours_remaining:.1f} hours remaining"
         }
