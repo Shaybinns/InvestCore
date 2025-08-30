@@ -10,7 +10,7 @@ def test_streaming_endpoint():
     
     # Test data
     data = {
-        "user_id": "test123",
+        "user_id": "550e8400-e29b-41d4-a716-446655440000",
         "message": "whats the price of Nvidia stock right now"
     }
     
