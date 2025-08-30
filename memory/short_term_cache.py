@@ -12,7 +12,19 @@ SHORT_TERM_DB = "short_term_memory"
 
 def get_db_connection():
     """Get connection to database using Railway's injected DATABASE_URL"""
-    return psycopg2.connect(os.getenv('DATABASE_URL'))
+    try:
+        database_url = os.getenv('DATABASE_URL')
+        print(f"Attempting to connect to database...")
+        print(f"Database URL exists: {database_url is not None}")
+        if database_url:
+            print(f"Database URL starts with: {database_url[:20]}...")
+        
+        conn = psycopg2.connect(database_url)
+        print(f"Database connection successful!")
+        return conn
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+        raise e
 
 def add_to_recent_conversation(user_id: str, message: str):
     """
@@ -76,8 +88,14 @@ def add_to_recent_conversation(user_id: str, message: str):
 def get_recent_conversation(user_id: str) -> str:
     """Get recent conversation as simple text"""
     try:
+        print(f"Getting recent conversation for user: {user_id}")
+        print(f"User ID type: {type(user_id)}")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        print(f"Executing query: SELECT recent_messages FROM {SHORT_TERM_DB} WHERE user_id = %s AND expires_at > CURRENT_DATE")
+        print(f"Query parameters: user_id={user_id}")
         
         cursor.execute(f"""
             SELECT recent_messages FROM {SHORT_TERM_DB}
@@ -85,18 +103,25 @@ def get_recent_conversation(user_id: str) -> str:
         """, (user_id,))
         
         result = cursor.fetchone()
+        print(f"Query result: {result}")
+        
         cursor.close()
         conn.close()
         
         if not result or not result[0]:
+            print("No messages found, returning empty string")
             return ""
         
         # Return messages as simple text, one per line
         messages = result[0]
+        print(f"Found {len(messages)} messages")
         return "\n".join(messages)
         
     except Exception as e:
         print(f"Error retrieving conversation: {e}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        traceback.print_exc()
         return ""
 
 def update_current_cache(user_id: str, cache_data: Dict[str, Any]):
