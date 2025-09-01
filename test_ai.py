@@ -11,7 +11,7 @@ def main():
     print("Type 'quit' to exit")
     print()
     
-    user_id = "test_user"
+    user_id = "a220247d-b621-4b8d-9653-f1f1d6b8f105"
     
     while True:
         try:
