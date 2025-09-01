@@ -11,7 +11,7 @@ from memory.long_term_db import (
 
 def test_long_term_memory():
     """Test the long-term memory system"""
-    test_user_id = "test_user_123"
+    test_user_id = "a220247d-b621-4b8d-9653-f1f1d6b8f105"
     
     print("🧠 Testing Long-Term Memory System")
     print("=" * 50)
