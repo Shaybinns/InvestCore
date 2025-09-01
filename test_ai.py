@@ -23,21 +23,16 @@ def main():
                 break
             
             if user_message.lower() == 'debug':
-                from memory.short_term_cache import cache
-                from memory.long_term_db import user_logs
+                from memory.short_term_cache import get_user_data_summary
+                from memory.long_term_db import get_user_data_summary as get_lt_summary
                 print(f"\n🔍 DEBUG INFO:")
-                print(f"Short-term cache entries: {len(cache)}")
-                print(f"Long-term storage entries: {len(user_logs)}")
-                if cache:
-                    for user_id, messages in cache.items():
-                        print(f"  User '{user_id}' has {len(messages)} messages:")
-                        for i, msg in enumerate(messages, 1):
-                            print(f"    {i}. {msg}")
-                if user_logs:
-                    for user_id, logs in user_logs.items():
-                        print(f"  Long-term storage for '{user_id}':")
-                        for i, log in enumerate(logs, 1):
-                            print(f"    {i}. {log['result']}")
+                short_term_summary = get_user_data_summary(user_id)
+                long_term_summary = get_lt_summary(user_id)
+                print(f"Short-term memory status: {short_term_summary.get('execution_status', 'unknown')}")
+                print(f"Long-term memory status: {long_term_summary.get('status', 'unknown')}")
+                print(f"Profile completeness: {long_term_summary.get('profile_completeness', '0%')}")
+                print(f"Has portfolio: {long_term_summary.get('has_portfolio', False)}")
+                print(f"Transaction count: {long_term_summary.get('transaction_count', 0)}")
                 continue
             
             if not user_message:

@@ -99,9 +99,9 @@ create_portfolio,
 optimise_portfolio, 
 analyse_portfolio, 
 simulate_portfolio, 
-get_user_info, 
+get_user_info- Get user's investment information including goals, pathway, and recent transactions (no requirements)(T)
 portfolio_calculation, 
-get_user_portfolio
+get_user_portfolio- Get user's portfolio information including holdings, performance, and recent transactions (no requirements)(T)
 
 Asset Research:
 get_asset_info- Get current market metrics for an asset like stock price, market cap, beta, open and more (requires symbol)(T)
