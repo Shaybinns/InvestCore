@@ -38,22 +38,30 @@ def extract_from_recent_chat(recent_chat: str, data_type: str, symbol: str = Non
 
 def run(args: dict):
     symbol = args["symbol"]
+    user_id = args.get("user_id")  # Fallback to default if not provided
     
-    # First, try to get data from recent conversation
-    recent_chat = get_recent_conversation("test_user")  # You might want to pass user_id as parameter
+    # Get data from current command stack execution results
+    from memory.short_term_cache import get_current_cache
+    current_cache = get_current_cache(user_id)
+    execution_results = current_cache.get("execution_results", [])
     
-    # Try to extract asset info from recent chat first
-    asset_info = extract_from_recent_chat(recent_chat, "asset_info", symbol)
+    # Find asset_info and market_assess results from the current stack execution
+    asset_info = None
+    market_data = None
+    
+    for result in execution_results:
+        if result["command"] == "get_asset_info" and result["is_required"]:
+            asset_info = result["result"]
+        elif result["command"] == "market_assess" and result["is_required"]:
+            market_data = result["result"]
+    
+    # Fallback to long-term database if not found in current execution
     if not asset_info:
-        # Fallback to long-term database
         asset_info = get_latest_result("get_asset_info", symbol)
         if not asset_info:
             asset_info = f"Asset info for {symbol} not available from previous commands. Please run get_asset_info first."
     
-    # Try to extract market data from recent chat first
-    market_data = extract_from_recent_chat(recent_chat, "market_data")
     if not market_data:
-        # Fallback to long-term database
         market_data = get_latest_result("market_assess")
         if not market_data:
             market_data = "Market assessment data not available from previous commands. Please run market_assess first."

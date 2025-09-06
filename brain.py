@@ -1,7 +1,9 @@
 from prompt import get_system_prompt
 from memory.short_term_cache import get_recent_conversation, add_to_recent_conversation
 from memory.command_stack import (
-    peek_stack, push_stack, has_pending_steps, mark_current_complete
+    peek_stack, push_stack, has_pending_steps, mark_current_complete,
+    build_command_stack_with_dependencies, execute_complete_stack,
+    resume_stack_execution
 )
 from command_engine import run_command
 from memory.long_term_db import save_result, get_user_facts
@@ -22,14 +24,37 @@ def handle_user_message(user_id: str, message: str) -> dict:
         filled = receive_input(user_id, message)
 
         if filled:
-            try:
-                result = run_command(filled["command"], filled["args"])
-                summary = summarise_result(filled["command"], result)
-                save_result(user_id, summary)
-                output = summarise_output(filled["command"], message, result)
-                reply = f"Thanks! I've got everything I need.\n\n{output}"
-            except Exception as e:
-                reply = f"[Error running command]: {str(e)}"
+            # Check if we're in a command stack execution
+            
+            if has_pending_steps(user_id):
+                # Resume stack execution
+                execution_result = resume_stack_execution(user_id, run_command)
+                
+                if execution_result.get("needs_input"):
+                    # Still need more input
+                    missing_fields = execution_result.get("missing_fields", [])
+                    current_command = execution_result.get("current_command", "unknown")
+                    prompts = [f"Please provide: {field}" for field in missing_fields]
+                    combined_prompt = "\n".join(prompts)
+                    reply = f"Thanks! Now I need a few more things for {current_command}:\n{combined_prompt}"
+                else:
+                    # Stack execution complete
+                    main_result = execution_result.get("main_command_result")
+                    if main_result:
+                        output = summarise_output(filled["command"], message, main_result)
+                        reply = f"Thanks! I've got everything I need.\n\n{output}"
+                    else:
+                        reply = f"Thanks! I've got everything I need. Command executed successfully."
+            else:
+                # Regular single command execution
+                try:
+                    result = run_command(filled["command"], filled["args"])
+                    summary = summarise_result(filled["command"], result)
+                    save_result(user_id, summary)
+                    output = summarise_output(filled["command"], message, result)
+                    reply = f"Thanks! I've got everything I need.\n\n{output}"
+                except Exception as e:
+                    reply = f"[Error running command]: {str(e)}"
         else:
             reply = f"Got it. What's the next input I need?"
 
@@ -115,49 +140,77 @@ User: {message}
             except (ImportError, AttributeError):
                 pass
 
-            # If we have pending steps, execute the current one
-            if has_pending_steps(user_id):
-                current = peek_stack(user_id)
-                if current and current["status"] == "pending":
-                    result = run_command(current["command"], current["args"])
-                    summary = summarise_result(current["command"], result)
-                    save_result(user_id, summary)
-                    mark_current_complete(user_id)
-                    output = summarise_output(current["command"], message, result)
-
-                    if has_pending_steps(user_id):
-                        follow_up = f"{output} — continuing to next step."
-                    else:
-                        follow_up = f"[Task Complete]\n{output}"
-
+            # Check if this command has dependencies that need to be built into a stack
+            from memory.command_stack import get_required_commands
+            required_commands = get_required_commands(command_name)
+            
+            if required_commands:
+                # Add user_id to args for command stack
+                args["user_id"] = user_id
+                # Build complete command stack with dependencies
+                build_command_stack_with_dependencies(user_id, command_name, args, goal=goal)
+                
+                # Execute the complete stack
+                execution_result = execute_complete_stack(user_id, run_command)
+                
+                # Check if we need user input
+                if execution_result.get("needs_input"):
+                    missing_fields = execution_result.get("missing_fields", [])
+                    current_command = execution_result.get("current_command", command_name)
+                    
+                    # Create prompts for missing fields
+                    prompts = [f"Please provide: {field}" for field in missing_fields]
+                    combined_prompt = "\n".join(prompts)
+                    
+                    follow_up = f"\n\nTo run {current_command}, I need a few things:\n{combined_prompt}"
                     add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
+                    
                     return {
                         "initial_response": reply,
                         "command_result": follow_up,
-                        "command_executed": True,
-                        "status": "step_complete",
-                        "command_name": current["command"],
-                        "has_more_steps": has_pending_steps(user_id)
+                        "command_executed": False,
+                        "status": "needs_input",
+                        "command_name": current_command,
+                        "missing_fields": missing_fields,
+                        "stack_executed": True
                     }
+                
+                # Get the main command result (not the required commands)
+                main_result = execution_result["main_command_result"]
+                
+                if main_result:
+                    output = summarise_output(command_name, message, main_result)
+                    follow_up = f"[Task Complete]\n{output}"
+                else:
+                    follow_up = f"[Task Complete] Command executed successfully."
+                
+                add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
+                return {
+                    "initial_response": reply,
+                    "command_result": follow_up,
+                    "command_executed": True,
+                    "status": "command_complete",
+                    "command_name": command_name,
+                    "goal": goal,
+                    "stack_executed": True
+                }
+            else:
+                # Simple command without dependencies - execute normally
+                result = run_command(command_name, args)
+                summary = summarise_result(command_name, result)
+                save_result(user_id, summary)
+                output = summarise_output(command_name, message, result)
 
-            # Otherwise run the new command
-            result = run_command(command_name, args)
-            summary = summarise_result(command_name, result)
-            save_result(user_id, summary)
-            push_stack(user_id, command_name, args, goal=goal)
-            mark_current_complete(user_id)
-            output = summarise_output(command_name, message, result)
-
-            follow_up = f"[Task Complete]\n{output}"
-            add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
-            return {
-                "initial_response": reply,
-                "command_result": follow_up,
-                "command_executed": True,
-                "status": "command_complete",
-                "command_name": command_name,
-                "goal": goal
-            }
+                follow_up = f"[Task Complete]\n{output}"
+                add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
+                return {
+                    "initial_response": reply,
+                    "command_result": follow_up,
+                    "command_executed": True,
+                    "status": "command_complete",
+                    "command_name": command_name,
+                    "goal": goal
+                }
 
         except Exception as e:
             error_msg = f"Command execution failed: {str(e)}"
@@ -271,46 +324,49 @@ def execute_command_streaming(command_name: str, args: dict, user_id: str, messa
         except (ImportError, AttributeError):
             pass
         
-        # If we have pending steps, execute the current one
-        if has_pending_steps(user_id):
-            current = peek_stack(user_id)
-            if current and current["status"] == "pending":
-                result = run_command(current["command"], current["args"])
-                summary = summarise_result(current["command"], result)
-                save_result(user_id, summary)
-                mark_current_complete(user_id)
-                output = summarise_output(current["command"], message, result)
-                
-                if has_pending_steps(user_id):
-                    follow_up = f"{output} — continuing to next step."
-                else:
-                    follow_up = f"[Task Complete]\n{output}"
-                
-                add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
-                return {
-                    "command_result": follow_up,
-                    "command_executed": True,
-                    "status": "step_complete",
-                    "command_name": current["command"],
-                    "has_more_steps": has_pending_steps(user_id)
-                }
+        # Check if this command has dependencies that need to be built into a stack
+        from memory.command_stack import get_required_commands
+        required_commands = get_required_commands(command_name)
         
-        # Otherwise run the new command
-        result = run_command(command_name, args)
-        summary = summarise_result(command_name, result)
-        save_result(user_id, summary)
-        push_stack(user_id, command_name, args, goal=None)
-        mark_current_complete(user_id)
-        output = summarise_output(command_name, message, result)
-        
-        follow_up = f"[Task Complete]\n{output}"
-        add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
-        return {
-            "command_result": follow_up,
-            "command_executed": True,
-            "status": "command_complete",
-            "command_name": command_name
-        }
+        if required_commands:
+            # Build complete command stack with dependencies
+            build_command_stack_with_dependencies(user_id, command_name, args, goal=None)
+            
+            # Execute the complete stack
+            execution_result = execute_complete_stack(user_id, run_command)
+            
+            # Get the main command result (not the required commands)
+            main_result = execution_result["main_command_result"]
+            
+            if main_result:
+                output = summarise_output(command_name, message, main_result)
+                follow_up = f"[Task Complete]\n{output}"
+            else:
+                follow_up = f"[Task Complete] Command executed successfully."
+            
+            add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
+            return {
+                "command_result": follow_up,
+                "command_executed": True,
+                "status": "command_complete",
+                "command_name": command_name,
+                "stack_executed": True
+            }
+        else:
+            # Simple command without dependencies - execute normally
+            result = run_command(command_name, args)
+            summary = summarise_result(command_name, result)
+            save_result(user_id, summary)
+            output = summarise_output(command_name, message, result)
+            
+            follow_up = f"[Task Complete]\n{output}"
+            add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
+            return {
+                "command_result": follow_up,
+                "command_executed": True,
+                "status": "command_complete",
+                "command_name": command_name
+            }
         
     except Exception as e:
         error_msg = f"Command execution failed: {str(e)}"

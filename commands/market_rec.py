@@ -97,7 +97,8 @@ def run(args: dict):
     """Main market recommendation function"""
     
     # First, try to get market data from recent conversation
-    recent_chat = get_recent_conversation("test_user")  # You might want to pass user_id as parameter
+    user_id = args.get("user_id")  # Fallback to default if not provided
+    recent_chat = get_recent_conversation(user_id)
     
     # Try to extract market data from recent chat first
     market_data = extract_from_recent_chat(recent_chat, "market_data")
