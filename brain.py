@@ -294,6 +294,8 @@ You are replying directly to the user's message, which is - User: {message}
 def execute_command_streaming(command_name: str, args: dict, user_id: str, message: str) -> dict:
     """Execute a command and return results for streaming"""
     try:
+        # Add user_id to args for command stack
+        args["user_id"] = user_id
         # Check for structured field metadata
         try:
             module = __import__(f"commands.{command_name}", fromlist=["get_required_fields"])
