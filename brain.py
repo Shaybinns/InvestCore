@@ -1,7 +1,7 @@
 from prompt import get_system_prompt
 from memory.short_term_cache import get_recent_conversation, add_to_recent_conversation
 from memory.command_stack import (
-    peek_stack, push_stack, has_pending_steps, mark_current_complete,
+    peek_stack, has_pending_steps,
     build_command_stack_with_dependencies, execute_complete_stack,
     resume_stack_execution
 )

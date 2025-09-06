@@ -13,16 +13,14 @@ from .short_term_cache import (
 )
 
 from .command_stack import (
-    push_stack,
     peek_stack,
-    pop_stack,
-    mark_current_complete,
-    start_command_execution,
     has_pending_steps,
-    get_stack_state,
     get_current_goal,
-    get_stack_summary,
-    clear_completed_stack
+    build_command_stack_with_dependencies,
+    execute_complete_stack,
+    resume_stack_execution,
+    get_required_commands,
+    check_required_fields
 )
 
 from .running_state import (
@@ -48,16 +46,14 @@ __all__ = [
     'get_user_data_summary',
     
     # Command stack functions
-    'push_stack',
     'peek_stack',
-    'pop_stack',
-    'mark_current_complete',
-    'start_command_execution',
     'has_pending_steps',
-    'get_stack_state',
     'get_current_goal',
-    'get_stack_summary',
-    'clear_completed_stack',
+    'build_command_stack_with_dependencies',
+    'execute_complete_stack',
+    'resume_stack_execution',
+    'get_required_commands',
+    'check_required_fields',
     
     # Running state functions
     'set_running',
