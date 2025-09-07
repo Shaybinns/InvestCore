@@ -49,7 +49,7 @@ def add_to_recent_conversation(user_id: str, message: str):
             messages = messages[-20:]
         
         # Update database with proper timestamps
-        if result and result[0]:
+        if result:
             # Existing user, update messages and expires_at
             cursor.execute(f"""
                 UPDATE {SHORT_TERM_DB}
