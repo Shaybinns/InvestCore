@@ -15,5 +15,12 @@
       "path": "/api/*",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     }
+  ],
+  "cron": [
+    {
+      "name": "daily-cleanup",
+      "schedule": "0 2 * * *",
+      "command": "python -c \"from memory.short_term_cache import cleanup_expired_entries; cleanup_expired_entries()\""
+    }
   ]
 }
