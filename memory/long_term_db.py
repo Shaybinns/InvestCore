@@ -14,6 +14,7 @@ def get_db_connection():
     """Get connection to database using Railway's injected DATABASE_URL"""
     return psycopg2.connect(os.getenv('DATABASE_URL'))
 
+
 def create_user_profile(user_id: str, profile_data: Dict[str, Any]) -> bool:
     """
     Create or update user profile with investment preferences and goals

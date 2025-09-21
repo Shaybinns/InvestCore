@@ -1,5 +1,5 @@
 from prompt import get_system_prompt
-from memory.short_term_cache import get_recent_conversation, add_to_recent_conversation
+from memory.short_term_cache import get_recent_conversation, add_to_recent_conversation, get_current_market_data
 from memory.command_stack import (
     peek_stack, has_pending_steps,
     build_command_stack_with_dependencies, execute_complete_stack,
@@ -73,15 +73,19 @@ def handle_user_message(user_id: str, message: str) -> dict:
         current = peek_stack(user_id)
         task_reminder = f"(You're currently in a multi-step task — next step is {current['command']}.)"
 
-    # STEP 3: Build full GPT context
+    # STEP 3: Build full GPT context with comprehensive stateful data
     system_prompt = get_system_prompt(user_id)
     recent_chat = get_recent_conversation(user_id)
     user_facts = get_user_facts(user_id)
     vector_recall = get_vector_matches(message)
+    market_data = get_current_market_data(user_id)
 
     context = f"""
-[User Facts]
+[User Facts & Profile]
 {user_facts}
+
+[Current Market Data]
+{market_data if market_data else "No current market data available"}
 
 [Relevant Knowledge]
 {vector_recall}
@@ -247,15 +251,19 @@ def generate_ai_response_only(user_id: str, message: str) -> str:
         current = peek_stack(user_id)
         task_reminder = f"(You're currently in a multi-step task — next step is {current['command']}.)"
     
-    # STEP 3: Build full GPT context
+    # STEP 3: Build full GPT context with comprehensive stateful data
     system_prompt = get_system_prompt(user_id)
     recent_chat = get_recent_conversation(user_id)
     user_facts = get_user_facts(user_id)
     vector_recall = get_vector_matches(message)
+    market_data = get_current_market_data(user_id)
     
     context = f"""
-[User Facts]
+[User Facts & Profile]
 {user_facts}
+
+[Current Market Data]
+{market_data if market_data else "No current market data available"}
 
 [Relevant Knowledge]
 {vector_recall}

@@ -13,7 +13,7 @@ def call_gpt(system_prompt, user_prompt):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        max_tokens=1000,
+        max_tokens=4000,
         temperature=0.5
     )
     return response.choices[0].message.content 

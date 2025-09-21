@@ -4,82 +4,15 @@ import json
 from datetime import datetime, timezone
 from llm_model import call_gpt
 from prompt import get_plugin_system_prompt
+from memory.short_term_cache import get_current_market_data
+from command_engine import run_command
 
 def get_required_fields():
     return {}  # No required fields - runs automatically
 
-def get_market_news():
-    """Fetch current market headlines and breaking news using Perplexity"""
-    headers = {
-        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-        "Content-Type": "application/json",
-    }
+# Data collection functions moved to get_market_data.py
 
-    # Get current datetime for context
-    current_time = datetime.now(timezone.utc)
-    current_date = current_time.strftime("%Y-%m-%d")
-    current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S UTC")
-
-    prompt = f"""Find the top 5-7 most important market-moving headlines and breaking news as of {current_time_str} (today is {current_date}). Focus on:
-- Major economic data releases from today
-- Central bank announcements from today
-- Geopolitical events affecting markets from today
-- Corporate earnings or major company news from today
-- Market sentiment indicators from today
-- Any breaking news that happened in the last few hours
-
-IMPORTANT: Only include news from today ({current_date}) or very recent breaking news. Ignore older news.
-
-Return only the headlines and brief context, no analysis yet."""
-
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers=headers,
-        json={
-            "model": "perplexity/sonar-pro",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 500
-        }
-    )
-
-    if response.status_code != 200:
-        raise Exception(f"News API Error: {response.status_code} — {response.text}")
-
-    data = response.json()
-    return data['choices'][0]['message']['content']
-
-def get_risk_proxy_data():
-    """Fetch current prices for key risk proxy assets"""
-    symbols = ["DX-Y.NYB", "^VIX", "^TNX", "^UST2YR", "GC=F", "^GSPC", "CL=F", "HG=F", "BTC-USD"]
-    
-    url = "https://yahoo-finance166.p.rapidapi.com/api/market/get-quote-v2"
-    headers = {
-        "x-rapidapi-key": os.getenv("RAPIDAPI_KEY"),
-        "x-rapidapi-host": "yahoo-finance166.p.rapidapi.com"
-    }
-
-    all_data = {}
-    for symbol in symbols:
-        querystring = {"symbols": symbol, "fields": "quoteSummary"}
-        response = requests.get(url, headers=headers, params=querystring)
-        
-        if response.status_code == 200:
-            data = response.json()
-            try:
-                result = data['quoteResponse']['result'][0]
-                all_data[symbol] = {
-                    "price": result.get("regularMarketPrice"),
-                    "change": result.get("regularMarketChangePercent"),
-                    "volume": result.get("regularMarketVolume")
-                }
-            except (KeyError, IndexError):
-                all_data[symbol] = {"error": "Data unavailable"}
-        else:
-            all_data[symbol] = {"error": f"API Error: {response.status_code}"}
-
-    return all_data
-
-def analyze_market_sentiment(news_data, risk_data):
+def analyze_market_sentiment(market_data):
     """Analyze market sentiment using GPT"""
     plugin_system_prompt = get_plugin_system_prompt()
     system_prompt = f"{plugin_system_prompt}\n\nYou are a market sentiment analyst within Portfolio AI. Your role is to analyze market conditions and provide strategic investment insights."
@@ -90,21 +23,9 @@ def analyze_market_sentiment(news_data, risk_data):
     current_date = current_time.strftime("%Y-%m-%d")
     
     user_prompt = f"""
-Analyze the current market conditions as of {current_time_str} (today is {current_date}) based on:
+Analyze the current market conditions as of {current_time_str} (today is {current_date}) based on the following market data:
 
-MARKET NEWS (from today):
-{news_data}
-
-RISK PROXY ASSETS (current prices as of {current_time_str}):
-DXY (Dollar Index): {risk_data.get('DX-Y.NYB', 'N/A')}
-VIX (Volatility): {risk_data.get('^VIX', 'N/A')}
-10Y Treasury: {risk_data.get('^TNX', 'N/A')}
-2Y Treasury: {risk_data.get('^UST2YR', 'N/A')}
-Gold: {risk_data.get('GC=F', 'N/A')}
-S&P 500: {risk_data.get('^GSPC', 'N/A')}
-Oil: {risk_data.get('CL=F', 'N/A')}
-Copper: {risk_data.get('HG=F', 'N/A')}
-Bitcoin: {risk_data.get('BTC-USD', 'N/A')}
+{market_data}
 
 Provide a concise 5-7 sentence analysis covering:
 1. What's driving market sentiment right now (as of {current_time_str})
@@ -120,18 +41,23 @@ Be strategic and actionable. Focus on the most important insights from today's d
 
 def run(args: dict):
     """Main market assessment function"""
+    user_id = args.get("user_id")
+    
     # Get current datetime for logging
     current_time = datetime.now(timezone.utc)
     current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+    current_date = current_time.strftime("%Y-%m-%d")
     
-    # Step 1: Get current market news
-    market_news = get_market_news()
+    # Step 1: Check if we have market data from today
+    market_data = get_current_market_data(user_id) if user_id else {}
     
-    # Step 2: Get risk proxy asset data
-    risk_data = get_risk_proxy_data()
+    # Step 2: If no market data from today, collect it
+    if not market_data or market_data.get("date") != current_date:
+        # Run get_market_data to collect fresh data
+        market_data = run_command("get_market_data", {"user_id": user_id})
     
-    # Step 3: Analyze and synthesize
-    market_analysis = analyze_market_sentiment(market_news, risk_data)
+    # Step 3: Analyze and synthesize using the complete market_data object
+    market_analysis = analyze_market_sentiment(market_data)
     
     # Add timestamp to the analysis
     timestamped_analysis = f"[Market Assessment as of {current_time_str}]\n\n{market_analysis}"

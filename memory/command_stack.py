@@ -39,7 +39,7 @@ def get_required_commands(command_name):
     # Define command dependencies
     command_dependencies = {
         "asset_assess": ["get_asset_info", "market_assess"],
-        "market_rec": ["market_assess"],
+        "market_rec": [],
         "portfolio_screener": ["get_investment_criteria", "market_assess"],
         "portfolio_construction": ["get_investment_criteria", "portfolio_screener", "market_assess"],
         "portfolio_calculation": ["portfolio_construction"],
