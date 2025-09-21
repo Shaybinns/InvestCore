@@ -41,7 +41,7 @@ def handle_user_message(user_id: str, message: str) -> dict:
                     # Stack execution complete
                     main_result = execution_result.get("main_command_result")
                     if main_result:
-                        output = summarise_output(filled["command"], message, main_result)
+                        output = summarise_output(filled["command"], message, main_result, user_id)
                         reply = f"Thanks! I've got everything I need.\n\n{output}"
                     else:
                         reply = f"Thanks! I've got everything I need. Command executed successfully."
@@ -51,7 +51,7 @@ def handle_user_message(user_id: str, message: str) -> dict:
                     result = run_command(filled["command"], filled["args"])
                     summary = summarise_result(filled["command"], result)
                     save_result(user_id, summary)
-                    output = summarise_output(filled["command"], message, result)
+                    output = summarise_output(filled["command"], message, result, user_id)
                     reply = f"Thanks! I've got everything I need.\n\n{output}"
                 except Exception as e:
                     reply = f"[Error running command]: {str(e)}"
@@ -183,7 +183,7 @@ User: {message}
                 main_result = execution_result["main_command_result"]
                 
                 if main_result:
-                    output = summarise_output(command_name, message, main_result)
+                    output = summarise_output(command_name, message, main_result, user_id)
                     follow_up = f"[Task Complete]\n{output}"
                 else:
                     follow_up = f"[Task Complete] Command executed successfully."
@@ -203,7 +203,7 @@ User: {message}
                 result = run_command(command_name, args)
                 summary = summarise_result(command_name, result)
                 save_result(user_id, summary)
-                output = summarise_output(command_name, message, result)
+                output = summarise_output(command_name, message, result, user_id)
 
                 follow_up = f"[Task Complete]\n{output}"
                 add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
@@ -349,7 +349,7 @@ def execute_command_streaming(command_name: str, args: dict, user_id: str, messa
             main_result = execution_result["main_command_result"]
             
             if main_result:
-                output = summarise_output(command_name, message, main_result)
+                output = summarise_output(command_name, message, main_result, user_id)
                 follow_up = f"[Task Complete]\n{output}"
             else:
                 follow_up = f"[Task Complete] Command executed successfully."
@@ -367,7 +367,7 @@ def execute_command_streaming(command_name: str, args: dict, user_id: str, messa
             result = run_command(command_name, args)
             summary = summarise_result(command_name, result)
             save_result(user_id, summary)
-            output = summarise_output(command_name, message, result)
+            output = summarise_output(command_name, message, result, user_id)
             
             follow_up = f"[Task Complete]\n{output}"
             add_to_recent_conversation(user_id, f"Assistant: {follow_up}")
