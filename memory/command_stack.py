@@ -38,7 +38,7 @@ def get_required_commands(command_name):
     """Get required commands for a given command"""
     # Define command dependencies
     command_dependencies = {
-        "asset_assess": ["get_asset_info", "market_assess"],
+        "asset_assess": ["get_asset_info"],
         "market_rec": [],
         "portfolio_screener": ["get_investment_criteria", "market_assess"],
         "portfolio_construction": ["get_investment_criteria", "portfolio_screener", "market_assess"],

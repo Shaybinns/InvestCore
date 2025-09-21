@@ -1,9 +1,11 @@
 import requests
 import os
 import json
+from datetime import datetime, timezone
 from llm_model import call_gpt
 from memory.long_term_db import get_latest_result
-from memory.short_term_cache import get_recent_conversation
+from memory.short_term_cache import get_recent_conversation, get_current_market_data, get_current_cache
+from command_engine import run_command
 from prompt import get_plugin_system_prompt
 
 def get_required_fields():
@@ -11,49 +13,23 @@ def get_required_fields():
         "symbol": {"prompt": "Which asset (ticker) would you like to assess?"}
     }
 
-### Use this until i update long_term_db to store historical runs of commands
-def extract_from_recent_chat(recent_chat: str, data_type: str, symbol: str = None):
-    """Extract specific data from recent conversation"""
-    lines = recent_chat.split('\n')
-    
-    if data_type == "asset_info":
-        # Look for asset info in recent chat
-        for i, line in enumerate(lines):
-            if symbol and symbol.upper() in line and any(keyword in line.lower() for keyword in ['trading at', 'price', 'current']):
-                # Get the next few lines for context
-                context = '\n'.join(lines[i:i+3])
-                return f"Recent asset info for {symbol}: {context}"
-    
-    elif data_type == "market_data":
-        # Look for market assessment data
-        for i, line in enumerate(lines):
-            if any(keyword in line.lower() for keyword in ['market', 'conditions', 'sentiment', 'volatility']):
-                # Get surrounding context
-                start = max(0, i-2)
-                end = min(len(lines), i+3)
-                context = '\n'.join(lines[start:end])
-                return f"Recent market data: {context}"
-    
-    return None
 
 def run(args: dict):
     symbol = args["symbol"]
     user_id = args.get("user_id")  # Fallback to default if not provided
     
-    # Get data from current command stack execution results
-    from memory.short_term_cache import get_current_cache
+    current_time = datetime.now(timezone.utc)
+    current_date = current_time.strftime("%Y-%m-%d")
+    
+    # Get asset_info from current command stack execution results
     current_cache = get_current_cache(user_id)
     execution_results = current_cache.get("execution_results", [])
     
-    # Find asset_info and market_assess results from the current stack execution
+    # Find asset_info from the current stack execution
     asset_info = None
-    market_data = None
-    
     for result in execution_results:
         if result["command"] == "get_asset_info" and result["is_required"]:
             asset_info = result["result"]
-        elif result["command"] == "market_assess" and result["is_required"]:
-            market_data = result["result"]
     
     # Fallback to long-term database if not found in current execution
     if not asset_info:
@@ -61,10 +37,13 @@ def run(args: dict):
         if not asset_info:
             asset_info = f"Asset info for {symbol} not available from previous commands. Please run get_asset_info first."
     
-    if not market_data:
-        market_data = get_latest_result("market_assess")
-        if not market_data:
-            market_data = "Market assessment data not available from previous commands. Please run market_assess first."
+    # Get market data from database market_data field (like market_assess does)
+    market_data = get_current_market_data(user_id) if user_id else {}
+    
+    # If no market data from today, collect it
+    if not market_data or market_data.get("date") != current_date:
+        # Run get_market_data to collect fresh data
+        market_data = run_command("get_market_data", {"user_id": user_id})
 
     # Analyze the asset using GPT
     plugin_system_prompt = get_plugin_system_prompt()
