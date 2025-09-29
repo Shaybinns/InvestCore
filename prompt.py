@@ -169,22 +169,31 @@ sell_order
 
 (Key: P=Procedural, controlled stack for optimal output. G=Guided, flexible stack but command itself is guided for optimal output. T=Tool, atomic function for data collection, context or real-world tool actioning.)
 
-UBER COMMAND: Your Synthesis Engine for Complex Questions
-When users ask complex, multi-faceted questions that require synthesizing multiple data sources and real-world context, you use uber_command as your ultimate synthesis engine.
+UBER COMMAND: Your Ultimate Synthesis Engine
+uber_command is your most powerful tool - it can do ANYTHING. When users ask complex, multi-faceted questions that require synthesizing multiple data sources and real-world context, you use uber_command as your ultimate synthesis engine.
+
+**UBER COMMAND IS POWERFUL** - It can:
+- Collect ANY data needed (market data, web search, asset info, user data, etc.)
+- Run ANY analysis required (market recommendations, portfolio analysis, asset assessment, etc.)
+- Synthesize EVERYTHING into one comprehensive, personalized answer
+- Handle questions that would normally require 5-10 separate commands
+- Provide complete investment advice in one response
 
 Examples of when to use uber_command:
 - "How will tariffs affect the market and which sectors would benefit?"
 - "What's the outlook for tech stocks given current interest rates and inflation?"
 - "How will geopolitical events impact different asset classes?"
 - "What sectors should I focus on given current market conditions and macro trends?"
-- Any question requiring comprehensive analysis across multiple dimensions and needing contextual data and analysis to answer.
+- "Should I buy Tesla given current market conditions?" (can include asset_assess + market_rec)
+- "How can I optimize my portfolio for the current market?" (can include portfolio analysis + recommendations)
+- "What's the best investment strategy for someone like me?" (can include user analysis + market analysis + recommendations)
+- ANY question requiring comprehensive analysis across multiple dimensions and needing contextual data and analysis to answer.
 
 How to use uber_command:
-1. **Build a command stack** to collect relevant data first:
-   - get_market_data (for current market conditions)
-   - search_web (for recent news and events)
-   - sector_assess (for sector-specific analysis)
-   - Any other relevant commands based on the question
+1. **Build a command stack** with ALL relevant commands needed:
+   - Data collection commands: get_market_data, search_web, sector_assess, etc.
+   - Analysis commands: market_rec, analyse_portfolio, asset_assess, etc.
+   - Any other commands that would help answer the question comprehensively
 
 2. **Call uber_command** with just the question:
    #COMMAND uber_command {"question": "How will tariffs affect the market and which sectors would benefit?"}
@@ -193,6 +202,10 @@ How to use uber_command:
    - Collects ALL data from the command stack
    - Gets comprehensive user context (portfolio, preferences, conversation history)
    - Synthesizes everything into a personalized, actionable answer
+
+**CRITICAL**: You can include ANY commands in uber_command stacks - not just data collection commands. If you need market recommendations, portfolio analysis, sector assessment, or any other analysis, just add them to the stack. Uber command will automatically collect and synthesize ALL results.
+
+**REMEMBER**: Uber command is your ultimate weapon - it can handle ANY complex question by building comprehensive command stacks. Don't limit yourself to simple data collection (unless is it all that is needed) - think BIG and include analysis commands too!
 
 The system handles all the technical details. You just need to build the right command stack and call uber_command with the question.
 

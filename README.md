@@ -45,8 +45,10 @@ When you ask a question, InvestCore's AI brain analyzes your intent:
 The AI automatically selects and runs the right financial analysis commands:
 - **Asset Analysis** → Fetches real-time data, financials, and performance metrics
 - **Portfolio Screening** → Applies filters and returns matching stocks
-- **Market Assessment** → Analyzes overall market conditions and sentiment
+- **Market Intelligence** → Collects comprehensive market data (news, risk proxies, macro indicators)
+- **Market Assessment** → Analyzes overall market conditions using cached data
 - **Sector Analysis** → Compares industry performance and trends
+- **Uber Command** → Synthesizes multiple data sources for complex questions
 
 ### **3. Intelligent Response Generation**
 Instead of raw data, you get actionable insights:
@@ -65,11 +67,12 @@ The central intelligence that:
 - Generates human-readable responses
 
 ### **🎮 Command Engine (`command_engine.py`)**
-Manages the execution of financial analysis commands:
+Manages the execution of financial analysis commands with intelligent command stacking:
 - **Asset Information** - Real-time stock data and metrics
 - **Financial Analysis** - Balance sheets, earnings, ratios
-- **Market Assessment** - Overall market conditions
+- **Market Intelligence** - Comprehensive market data collection and analysis
 - **Portfolio Tools** - Screening, optimization, risk analysis
+- **Uber Command** - Ultimate synthesis engine for complex multi-faceted questions
 
 ### **📱 Web Interface (`test_dashboard.py`)**
 A modern chatbot interface that:
@@ -99,6 +102,18 @@ InvestCore: "Let me analyze Tesla (TSLA) for you. I'll check the current market 
 InvestCore: "Tesla is currently trading at $X with a market cap of $Y. The stock has [performance summary]. Key metrics include [P/E, growth rates, etc.]. Based on recent earnings and market trends, [analysis and insights]."
 ```
 
+### **Complex Analysis Made Simple**
+Ask sophisticated questions and get comprehensive answers:
+
+```
+You: "How will tariffs affect the market and which sectors would benefit?"
+InvestCore: "I'll analyze the tariff impact comprehensively. Let me gather market data, research recent developments, assess sector performance, and provide personalized recommendations..."
+
+[AI builds command stack: get_market_data, search_web, sector_assess, market_rec, uber_command]
+
+InvestCore: "Based on comprehensive analysis of current market conditions, tariff implications, and sector dynamics, here's what I found: [detailed synthesis with market data, sector analysis, personalized recommendations, and actionable insights]."
+```
+
 ### **Portfolio Analysis Made Simple**
 Get comprehensive portfolio insights:
 
@@ -123,19 +138,47 @@ InvestCore: "Let me check the current performance of the technology sector and c
 InvestCore: "The tech sector is currently [performance summary] with [key trends]. Notable movers include [top performers/decliners]. This compares to [market context] and suggests [market insights]."
 ```
 
+## 🚀 Key Features & Commands
+
+### **🧠 Core Intelligence Commands**
+- **`uber_command`** - Ultimate synthesis engine for complex multi-faceted questions. Can combine ANY commands to provide comprehensive analysis
+- **`get_market_data`** - Collects comprehensive market data (news, risk proxies, macro indicators) with intelligent daily caching
+- **`market_assess`** - Analyzes current market conditions using cached data, automatically refreshing when needed
+- **`market_rec`** - Provides personalized asset recommendations based on market conditions and user profile
+
+### **📊 Asset Analysis Commands**
+- **`asset_assess`** - Comprehensive buy/sell/hold analysis with market context
+- **`get_asset_info`** - Real-time stock data, metrics, and performance indicators
+- **`get_financials`** - Detailed financial statements and ratios
+- **`get_earnings`** - Earnings analysis and growth trends
+
+### **🎯 Portfolio Management Commands**
+- **`create_portfolio`** - Complete portfolio construction with screening, optimization, and analysis
+- **`analyse_portfolio`** - Comprehensive portfolio analysis and optimization recommendations
+- **`portfolio_screener`** - Advanced asset screening based on custom criteria
+- **`portfolio_construction`** - Intelligent portfolio building with risk management
+
+### **🌐 Market Intelligence Commands**
+- **`sector_assess`** - Sector-specific analysis and performance evaluation
+- **`search_web`** - Real-time web search for current events and market news
+- **`get_user_facts`** - Personalized user profile and investment preferences
+- **`get_investment_criteria`** - User's risk tolerance, goals, and investment style
+
 ## 🔍 What Makes It Special
 
 ### **🤖 True AI Understanding**
 Unlike traditional financial tools that require specific commands, InvestCore understands context and intent:
 - **Follow-up questions** work naturally
-- **Complex requests** are broken down automatically
+- **Complex requests** are broken down automatically using intelligent command stacking
+- **Multi-faceted questions** are handled by the powerful uber_command synthesis engine
 - **Missing information** is requested intelligently
 
 ### **📊 Real-Time Intelligence**
 Get current market insights, not just historical data:
-- **Live market data** from multiple sources
-- **Real-time analysis** of current conditions
+- **Live market data** from multiple sources with intelligent caching
+- **Real-time analysis** of current conditions using cached market data
 - **Dynamic recommendations** based on market changes
+- **Comprehensive market data collection** (news, risk proxies, macro indicators) in one efficient operation
 
 ### **🎯 Actionable Insights**
 Every response includes:
@@ -189,16 +232,20 @@ InvestCore is built with a modular architecture that makes it easy to:
 ### **AI-Powered Decision Making**
 The system uses advanced AI to:
 - **Understand natural language** queries and context
-- **Select optimal commands** for each analysis request
+- **Select optimal commands** for each analysis request using intelligent command stacking
+- **Build comprehensive command stacks** for complex questions using uber_command
 - **Generate human-readable** explanations of complex data
 - **Provide intelligent follow-up** suggestions
+- **Synthesize multiple data sources** into comprehensive, personalized answers
 
 ### **Real-Time Data Integration**
-Connect to multiple financial data sources:
+Connect to multiple financial data sources with intelligent caching:
 - **Market Data APIs** for real-time pricing and volume
 - **Financial Statement APIs** for company fundamentals
 - **Economic Data APIs** for macroeconomic indicators
 - **News APIs** for market sentiment and events
+- **Intelligent Caching System** - Market data is cached daily and automatically refreshed when needed
+- **Command Stack Architecture** - Commands can be combined dynamically for comprehensive analysis
 
 ## 📊 Performance & Reliability
 
