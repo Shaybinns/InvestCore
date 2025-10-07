@@ -2,137 +2,199 @@ import requests
 import os
 from llm_model import call_gpt
 import json
+from datetime import datetime, timezone
 from prompt import get_plugin_system_prompt
+from memory.short_term_cache import get_current_market_data
+from command_engine import run_command
+from commands.get_user_info import run_command as get_user_info
 
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
-
-YF_HEADERS = {
-    "X-RapidAPI-Host": "yahoo-finance166.p.rapidapi.com",
-    "X-RapidAPI-Key": RAPIDAPI_KEY,
-    "Content-Type": "application/json"
-}
-
-def parse_user_input_to_filters(user_input): # replace the 'some fields you can use' with a db of the fields
+def create_perplexity_search_query(user_request, user_info, market_data):
+    """Create an optimized Perplexity search query using AI, incorporating user context and market data"""
     plugin_system_prompt = get_plugin_system_prompt()
-    system_prompt = f"{plugin_system_prompt}\n\nYou are Portfolio AI's filter parser. Your role is to convert natural language into structured screening filters."
+    system_prompt = f"{plugin_system_prompt}\n\nYou are Portfolio AI's search query optimizer. Your role is to create highly targeted Perplexity search queries for asset screening."
     
-    prompt = f"""You are an expert investment assistant. The user will give you a natural language description of the kind of stocks they want to screen for.
+    # Get current datetime for context
+    current_time = datetime.now(timezone.utc)
+    current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+    current_date = current_time.strftime("%Y-%m-%d")
+    
+    prompt = f"""You are an expert investment research assistant. Create a precise Perplexity search query to find the best investment opportunities based on the user's request, their investment profile, and current market conditions.
 
-Your job is to return a list of JSON filters in the following format:
-[
-  {{"field": "intradayprice", "operator": "GT", "value": 50}},
-  {{"field": "dayvolume", "operator": "GT", "value": 10000}},
-  ...
-]
+Current Date/Time: {current_time_str} (today is {current_date})
 
-Where field is the field you want to filter on like intradayprice, sector, etc, operator is the operator you want to use like GT, LT, BTWN, EQ, and value is the value you want to use for the filter like 50, Financial Services.
+User's Request: "{user_request}"
 
-Only use fields from Yahoo Finance screener. Keep the result concise. DO NOT explain or comment—only return the JSON.
+User's Investment Profile:
+{json.dumps(user_info, indent=2)}
 
-User input: "{user_input}"
+Current Market Context:
+{json.dumps(market_data, indent=2)}
 
-Here are the some of the field values you can use for sectors or industries:
-The sectors you can use are: Basic Materials, Consumer Cyclical, Financial Services, Real Estate, Consumer Defensive, Healthcare, Utilities, Communication Services, Energy, Industrials, andTechnology.
-The industries you can use are: Agricultural Inputs, Building Materials, Chemicals, Specialty Chemicals, Lumber & Wood Production, Paper & Paper Products, Aluminum, Copper, Other Industrial Metals & Mining, Gold, Silver, Other Precious Metals & Mining, Coking Coal, Steel, Auto & Truck Dealerships, Auto Manufacturers, Auto Parts, Recreational Vehicles, Furnishings, Fixtures & Appliances, Residential Construction, Textile Manufacturing, Apparel Manufacturing, Footwear & Accessories, Packaging & Containers, Personal Services, Restaurants, Apparel Retail, Department Stores, Home Improvement Retail, Luxury Goods, Internet Retail, Specialty Retail, Gambling, Leisure, Lodging, Resorts & Casinos, Travel Services, Asset Management, Banks—Diversified, Banks—Regional, Mortgage Finance, Capital Markets, Financial Data & Stock Exchanges, Insurance—Life, Insurance—Property & Casualty, Insurance—Reinsurance, Insurance—Specialty, Insurance Brokers, Insurance—Diversified, Shell Companies, Financial Conglomerates, Credit Services, Real Estate—Development, Real Estate Services, Real Estate—Diversified, REIT—Healthcare Facilities, REIT—Hotel & Motel, REIT—Industrial, REIT—Office, REIT—Residential, REIT—Retail, REIT—Mortgage, REIT—Specialty, REIT—Diversified, Beverages—Brewers, Beverages—Wineries & Distilleries, Beverages—Non-Alcoholic, Confectioners, Farm Products, Household & Personal Products, Packaged Foods, Education & Training Services, Discount Stores, Food Distribution, Grocery Stores, Tobacco, Biotechnology, Drug Manufacturers—General, Drug Manufacturers—Specialty & Generic, Healthcare Plans, Medical Care Facilities, Pharmaceutical Retailers, Health Information Services, Medical Devices, Medical Instruments & Supplies, Diagnostics & Research, Medical Distribution, Utilities—Independent Power Producers, Utilities—Renewable, Utilities—Regulated Water, Utilities—Regulated Electric, Utilities—Regulated Gas, Utilities—Diversified, Telecom Services, Advertising Agencies, Publishing, Broadcasting, Entertainment, Internet Content & Information, Electronic Gaming & Multimedia, Oil & Gas Drilling, Oil & Gas E&P, Oil & Gas Integrated, Oil & Gas Midstream, Oil & Gas Refining & Marketing, Oil & Gas Equipment & Services, Thermal Coal, Uranium, Aerospace & Defense, Specialty Business Services, Consulting Services, Rental & Leasing Services, Security & Protection Services, Staffing & Employment Services, Conglomerates, Engineering & Construction, Infrastructure Operations, Building Products & Equipment, Farm & Heavy Construction Machinery, Industrial Distribution, Business Equipment & Supplies, Specialty Industrial Machinery, Metal Fabrication, Pollution & Treatment Controls, Tools & Accessories, Electrical Equipment & Parts, Airports & Air Services, Airlines, Railroads, Marine Shipping, Trucking, Integrated Freight & Logistics, Waste Management, Information Technology Services, Software—Application, Software—Infrastructure, Communication Equipment, Computer Hardware, Consumer Electronics, Electronic Components, Electronics & Computer Distribution, Scientific & Technical Instruments, Semiconductor Equipment & Materials, Semiconductors, Solar
+Your task: Create a single, focused Perplexity search query that:
+1. Directly addresses the user's investment request
+2. Incorporates relevant aspects of their investment goals and risk profile
+3. Considers current market conditions and opportunities
+4. Searches for specific stocks, sectors, or asset types that would be most suitable
 
-Example:
-User input: "I want to screen for stocks over $50 with volume above 10k"
-Result: [{{"field": "intradayprice", "operator": "GT", "value": 50}}, {{"field": "dayvolume", "operator": "GT", "value": 10000}}]
+The query should be:
+- Specific and actionable (include specific company names, sectors, or investment themes when relevant)
+- Current (emphasize recent developments, earnings, or market conditions)
+- Personalized (consider the user's investment style and objectives)
+- Comprehensive (cover multiple angles of the investment opportunity)
+
+Return ONLY the search query text, no explanations or additional text.
+
+Example format: "Best technology stocks to buy December 2024 with strong earnings growth and low volatility for conservative investors"
 """
-    result = call_gpt(system_prompt, prompt)
-    return result
-
-def build_filter_clause(filters):
-    """Converts user-friendly filters to Yahoo Finance screener operands."""
-    operand_blocks = []
-    for f in filters:
-        op_block = {
-            "operator": "or",
-            "operands": [   
-                {
-                    "operator": f["operator"].upper(),
-                    "operands": [
-                        f["field"],
-                        *([f["value"]] if f["operator"].upper() != "BTWN" else f["value"])
-                    ]
-                }
-            ]
-        }
-        operand_blocks.append(op_block)
-    return operand_blocks
-
-def screen_assets(filters):
-    url = "https://yahoo-finance166.p.rapidapi.com/api/screener/list"
-
-    querystring = {
-        "sortType": "DESC",
-        "sortField": "percentchange",
-        "size": "20",
-        "offset": "0"
-    }
-
-    region_filter = {
-        "operator": "or",
-        "operands": [
-            {
-                "operator": "EQ",
-                "operands": ["region", "us"]
-            }
-        ]
-    }
-
-    payload = {
-        "operator": "and",
-        "operands": [
-            region_filter,
-            *build_filter_clause(filters)
-        ]
-    }
-
-    response = requests.post(url, headers=YF_HEADERS, params=querystring, json=payload)
-    data = response.json()
-
-    try:
-        results = data["data"]["items"][:5]  # Top 5 results
-        summaries = []
-        for item in results:
-            summaries.append(f"{item['shortName']} ({item['symbol']}): ${item['regularMarketPrice']} — {item['regularMarketChangePercent']:.2f}%")
-        screening_results = "Top Matches:\n" + "\n".join(summaries)
-    except Exception as e:
-        screening_results = f"Error parsing screener results: {str(e)}"
-        return screening_results
-
-    # Use GPT to analyze the screening results
-    plugin_system_prompt = get_plugin_system_prompt()
-    system_prompt = f"{plugin_system_prompt}\n\nYou are Portfolio AI's asset screening specialist. Your role is to analyze screening results and provide actionable investment insights."
     
-    prompt = f"""Analyze the following asset screening results based on the criteria: {filters}
+    result = call_gpt(system_prompt, prompt)
+    return result.strip()
 
-Screening Results:
-{screening_results}
+def search_assets_with_perplexity(search_query):
+    """Search for assets using Perplexity API"""
+    headers = {
+        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+        "Content-Type": "application/json",
+    }
 
-Please provide:
-1. Summary of what the screening revealed
-2. Key patterns or trends in the results
-3. Notable opportunities or risks
-4. Recommendations for further analysis
-5. Any adjustments to consider for the screening criteria
+    # Get current datetime for context
+    current_time = datetime.now(timezone.utc)
+    current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+    current_date = current_time.strftime("%Y-%m-%d")
 
-Be specific and actionable in your analysis."""
+    prompt = f"""You are an expert financial analyst. The current date and time is {current_time_str} (today is {current_date}).
+
+Find at least 10 investment assets based on the user's search request:
+
+{search_query}
+
+For each opportunity, evaluate using these criteria:
+1. Does this asset satisfy what the user is asking for?
+2. Will this asset perform well in the next 6-12 months based on current market conditions?
+3. Does this asset align with the user's preferences and investment profile?
+4. Does this asset have solid financials?
+
+Please provide at least 10 specific investment recommendations with:
+   - Company name and ticker symbol
+   - Current stock price (as of {current_date})
+   - Recent performance and key metrics
+   - Brief investment thesis (why this is a good opportunity)
+   - Key risks or considerations
+   - How it meets the 4 evaluation criteria above
+
+For each recommendation, include recent news or developments that support the investment case.
+
+Focus on actionable, current opportunities with concrete reasoning. Provide diverse options across different sectors and market caps when relevant.
+
+Format your response clearly with specific company names, ticker symbols, and current data.
+"""
+
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        json={
+            "model": "perplexity/sonar-pro",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 3000
+        }
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"Perplexity API Error: {response.status_code} — {response.text}")
+
+    data = response.json()
+    return data['choices'][0]['message']['content']
+
+def organize_screening_results(perplexity_results, user_request):
+    """Organize Perplexity results into structured screening results format"""
+    plugin_system_prompt = get_plugin_system_prompt()
+    system_prompt = f"{plugin_system_prompt}\n\nYou are Portfolio AI's result organizer. Your role is to structure and analyze search results into actionable investment insights."
+    
+    prompt = f"""Analyze and organize the following asset search results based on the user's original request: "{user_request}"
+
+Search Results:
+{perplexity_results}
+
+The search found multiple investment opportunities. Please provide a structured analysis with:
+
+1. **EXECUTIVE SUMMARY** - 2-3 sentence overview of the investment landscape and best opportunities found
+
+2. **TOP TIER RECOMMENDATIONS** - List the 3-5 highest-quality investments that best meet all criteria:
+   - Company name and ticker
+   - Current price and recent performance
+   - Key investment thesis
+   - Risk level and considerations
+   - How it scores on the 4 evaluation criteria
+   - Does this asset align with Portfolio AI's investment criteria?
+
+3. **SECONDARY OPTIONS** - List 2-3 additional solid opportunities that are worth considering:
+   - Company name and ticker
+   - Brief reasoning for inclusion
+   - Any notable strengths or concerns
+
+4. **MARKET INSIGHTS** - What these results reveal about current market conditions and investment themes
+
+5. **PORTFOLIO CONSIDERATIONS** - How these opportunities could work together in a diversified portfolio and fit into the user's current portfolio if applicable
+
+6. **NEXT STEPS** - Specific actions the user should consider (research priorities, buy/sell recommendations, etc.)
+
+7. **ALTERNATIVE APPROACHES** - If the search didn't yield ideal results, suggest other screening criteria or investment themes to explore
+
+Focus on actionable insights and provide clear reasoning for why certain assets are prioritized over others.
+"""
     
     analysis = call_gpt(system_prompt, prompt)
     
-    # Return both the raw results and the analysis
-    return f"{screening_results}\n\nANALYSIS:\n{analysis}"
+    # Format the final result
+    screening_results = f"ASSET SCREENING RESULTS\n{'='*50}\n\n{analysis}"
+    
+    return screening_results
 
 def get_required_fields():
     return {
         "filters": {
-            "prompt": "What kind of stocks are you looking for? (e.g., stocks over $50 with volume above 10k)"
+            "prompt": "What kind of stocks or investments are you looking for? (e.g., tech stocks with strong growth, dividend-paying utilities, AI companies)"
         }
     }
 
 def run(args: dict):
+    """Main asset screening function using Perplexity search"""
     user_query = args["filters"]
-    parsed_filters = parse_user_input_to_filters(user_query)
-    return screen_assets(json.loads(parsed_filters))
+    user_id = args.get("user_id")
+    
+    # Get current datetime for logging
+    current_time = datetime.now(timezone.utc)
+    current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+    current_date = current_time.strftime("%Y-%m-%d")
+    
+    try:
+        # Step 1: Get or collect market data (similar to market_assess)
+        if user_id:
+            market_data = get_current_market_data(user_id)
+            # If no market data from today, collect it
+            if not market_data or market_data.get("date") != current_date:
+                market_data = run_command("get_market_data", {"user_id": user_id})
+        else:
+            # For users without ID, collect fresh market data
+            market_data = run_command("get_market_data", {"user_id": None})
+        
+        # Step 2: Get user information
+        user_info = get_user_info({"user_id": user_id}) if user_id else {}
+        
+        # Step 3: Create optimized Perplexity search query
+        search_query = create_perplexity_search_query(user_query, user_info, market_data)
+        
+        # Step 4: Search for assets using Perplexity
+        perplexity_results = search_assets_with_perplexity(search_query)
+        
+        # Step 5: Organize results into screening format
+        screening_results = organize_screening_results(perplexity_results, user_query)
+        
+        # Add timestamp to the results
+        timestamped_results = f"[Asset Screening as of {current_time_str}]\n\n{screening_results}"
+        
+        return timestamped_results
+        
+    except Exception as e:
+        error_message = f"Error during asset screening: {str(e)}"
+        return f"[Asset Screening as of {current_time_str}]\n\n{error_message}"

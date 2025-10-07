@@ -1,7 +1,7 @@
 # main.py
 from brain import handle_user_message
 
-user_id = "a220247d-b621-4b8d-9653-f1f1d6b8f105"
+user_id = "afc49135-a270-4cda-b4ae-6a05d68cc903"
 
 print("Portfolio AI is ready. Type your message below:")
 
